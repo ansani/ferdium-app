@@ -26,7 +26,7 @@ const CHANNEL_TO_COMMAND: Record<string, string> = {
 };
 
 /**
- * Normalise variadic args into a single plain-object payload suitable for
+ * Normalize variadic args into a single plain-object payload suitable for
  * Tauri's invoke(). Rules:
  *  - No args → empty object.
  *  - Single plain-object arg → pass through as-is (named parameters).
@@ -34,7 +34,7 @@ const CHANNEL_TO_COMMAND: Record<string, string> = {
  *    so positional data is preserved; Rust commands must accept
  *    `args: Vec<serde_json::Value>` for those cases.
  */
-function normalisePayload(args: any[]): Record<string, unknown> {
+function normalizePayload(args: any[]): Record<string, unknown> {
   if (args.length === 0) return {};
   if (
     args.length === 1 &&
@@ -55,7 +55,7 @@ export async function ipcInvoke<T = unknown>(
   ...args: any[]
 ): Promise<T> {
   const command = CHANNEL_TO_COMMAND[channel] ?? toSnakeCase(channel);
-  return invoke<T>(command, normalisePayload(args));
+  return invoke<T>(command, normalizePayload(args));
 }
 
 /**
@@ -63,7 +63,7 @@ export async function ipcInvoke<T = unknown>(
  */
 export function ipcSend(channel: string, ...args: any[]): void {
   const command = CHANNEL_TO_COMMAND[channel] ?? toSnakeCase(channel);
-  invoke(command, normalisePayload(args)).catch((err: unknown) => {
+  invoke(command, normalizePayload(args)).catch((err: unknown) => {
     console.warn(`[tauri-ipc] ipcSend(${channel}) failed:`, err);
   });
 }

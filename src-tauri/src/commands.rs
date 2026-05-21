@@ -218,16 +218,19 @@ pub fn set_auto_launch(enabled: bool, app: AppHandle) -> Result<(), String> {
     }
 }
 
+/// Update the D-Bus unread-message badge (e.g. Unity LauncherEntry or
+/// KDE/GNOME taskbar) with the current unread counts.
+///
+/// This is a stub implementation — the full D-Bus integration will be added
+/// when targeting desktop environments that expose the
+/// `com.canonical.Unity.LauncherEntry` or equivalent interface.
 #[tauri::command]
 pub fn update_dbus_unread(
     _direct: u32,
     _indirect: u32,
     _unread_services: Value,
 ) {
-    // On platforms with D-Bus support this would update the taskbar badge via
-    // the com.canonical.Unity.LauncherEntry D-Bus API.  For now this is a
-    // no-op stub that correctly accepts the typed arguments sent from the
-    // frontend so that Tauri's argument deserialization succeeds.
+    // No-op stub. See doc comment above.
 }
 
 fn generate_token() -> String {

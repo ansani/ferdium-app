@@ -55,7 +55,7 @@ export default class RequestStore extends TypedStore {
       );
       this.setData({ port: info.port, token: info.token });
     } catch (err) {
-      console.warn('[RequestStore] start_local_server failed:', err);
+      console.warn('[RequestStore] startLocalServer failed:', err);
     }
   }
 
