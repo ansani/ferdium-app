@@ -35,8 +35,8 @@ pnpm build                # Production build: esbuild + tauri build
 
 ### Process Model (Tauri)
 
-- **Main process** (`src/index.ts`): App lifecycle, window management, IPC handlers, deep linking, auto-updates, tray icon, global shortcuts
-- **Renderer process** (`src/app.tsx`): React UI with MobX state management and React Router
+- **Tauri backend** (`src-tauri/src/main.rs`): App lifecycle, native plugin wiring, command registration, and window setup
+- **Frontend bootstrap** (`src/index.ts` + `src/app.tsx`): React UI initialization, MobX stores, routing, and renderer logic
 
 ### State Management (MobX)
 
