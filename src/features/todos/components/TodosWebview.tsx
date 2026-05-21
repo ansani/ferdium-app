@@ -160,8 +160,11 @@ class TodosWebview extends Component<IProps, IState> {
     }
 
     const { handleClientMessage } = this.props;
-    this.webview.addEventListener('message', (e: MessageEvent) => {
-      const { channel, args } = e.data || {};
+    window.addEventListener('message', (e: MessageEvent) => {
+      const { channel, args } = (e.data || {}) as {
+        channel?: string;
+        args?: any[];
+      };
       if (channel) handleClientMessage(channel, args?.[0]);
     });
   };
@@ -175,7 +178,6 @@ class TodosWebview extends Component<IProps, IState> {
       classes,
       isTodosServiceActive,
       isVisible,
-      userAgent,
       todoUrl,
       isTodoUrlValid,
     } = this.props;

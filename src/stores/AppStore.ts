@@ -218,10 +218,15 @@ export default class AppStore extends TypedStore {
     setInterval(() => this._checkForUpdates(), CHECK_INTERVAL);
     // Check for an update in 30s (need a delay to prevent Squirrel Installer lock file issues)
     setTimeout(() => this._checkForUpdates(), ms('30s'));
-    ipcOn('autoUpdate', (_, data) => {
+    ipcOn<{
+      available?: boolean;
+      version?: string;
+      downloaded?: boolean;
+      error?: { message?: string };
+    }>('autoUpdate', (_, data) => {
       if (this.updateStatus !== this.updateStatusTypes.FAILED) {
         if (data.available) {
-          this.updateVersion = data.version;
+          this.updateVersion = data.version || '';
           this.updateStatus = this.updateStatusTypes.AVAILABLE;
         }
 
@@ -249,7 +254,7 @@ export default class AppStore extends TypedStore {
     });
 
     // Handle deep linking (ferdium://)
-    ipcOn('navigateFromDeepLink', (_, data) => {
+    ipcOn<{ url: string }>('navigateFromDeepLink', (_, data) => {
       debug('Navigate from deep link', data);
       let { url } = data;
       if (!url) return;
@@ -287,7 +292,7 @@ export default class AppStore extends TypedStore {
     this.isSystemDarkModeEnabled =
       window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-    ipcOn('isWindowFocused', (_, isFocused) => {
+    ipcOn<boolean>('isWindowFocused', (_, isFocused) => {
       debug('Setting is focused to', isFocused);
       this.isFocused = isFocused;
     });
@@ -426,7 +431,7 @@ export default class AppStore extends TypedStore {
       host: {
         platform: process.platform,
         release: osRelease,
-        screens: screen.getAllDisplays(),
+        screens: [],
       },
       ferdium: {
         version: ferdiumVersion,

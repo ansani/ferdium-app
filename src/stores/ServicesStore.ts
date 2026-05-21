@@ -743,8 +743,6 @@ export default class ServicesStore extends TypedStore {
         debug('Webview is not attached, initializing');
         service.initializeWebViewEvents({
           handleIPCMessage: this.actions.service.handleIPCMessage,
-          openWindow: this.actions.service.openWindow,
-          stores: this.stores,
         });
         service.initializeWebViewListener();
       }

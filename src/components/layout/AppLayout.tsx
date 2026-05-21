@@ -17,7 +17,7 @@ import { updateVersionParse } from '../../helpers/update-helpers';
 import InfoBar from '../ui/InfoBar';
 import ErrorBoundary from '../util/ErrorBoundary';
 
-import { isMac, isWindows } from '../../environment';
+import { isMac } from '../../environment';
 import { ipcSend } from '../../tauri-ipc';
 import Todos from '../../features/todos/containers/TodosScreen';
 import { workspaceStore } from '../../features/workspaces';
@@ -140,7 +140,6 @@ class AppLayout extends Component<PropsWithChildren<IProps>, IState> {
       retryRequiredRequests,
       areRequiredRequestsLoading,
       updateVersion,
-      isUpdateAvailable,
     } = this.props;
 
     const { intl } = this.props;

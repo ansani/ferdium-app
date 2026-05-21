@@ -22,7 +22,7 @@ export const checkIfCertIsPresent = (clientCert: Certificate): boolean => {
   let certToVerify: X509Certificate | undefined;
 
   try {
-    if (clientCertHasCA) {
+    if (clientCertHasCA && clientCert.issuerCert) {
       certToVerify = new X509Certificate(clientCert.issuerCert.data);
     }
 

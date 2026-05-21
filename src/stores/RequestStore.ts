@@ -46,8 +46,8 @@ export default class RequestStore extends TypedStore {
     this.userInfoRequest = this.stores.user.getUserInfoRequest;
     this.servicesRequest = this.stores.services.allServicesRequest;
 
-    ipcOn('localServerPort', (_, data) => {
-      this.setData(data);
+    ipcOn<{ port: number; token?: string }>('localServerPort', (_, data) => {
+      this.setData({ port: data.port, token: data.token });
     });
   }
 

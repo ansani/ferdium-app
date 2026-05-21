@@ -127,20 +127,6 @@ class WorkspaceDrawerItem extends Component<IProps> {
 
     const compactClass = isCompact ? 'compact' : '';
 
-    const contextMenuTemplate = [
-      {
-        label: name,
-        enabled: false,
-      },
-      {
-        type: 'separator' as const,
-      },
-      {
-        label: intl.formatMessage(messages.contextMenuEdit),
-        click: onContextMenuEditClick || noop,
-      },
-    ];
-
     return (
       // eslint-disable-next-line jsx-a11y/no-static-element-interactions
       <div

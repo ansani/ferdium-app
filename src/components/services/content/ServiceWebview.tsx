@@ -1,6 +1,6 @@
 import { action, makeObservable, observable } from 'mobx';
 import { observer } from 'mobx-react';
-import { Component, type ReactElement, createRef } from 'react';
+import { Component, type ReactElement } from 'react';
 import type ServiceModel from '../../../models/Service';
 import type { RealStores } from '../../../stores';
 
@@ -20,8 +20,6 @@ interface IProps {
 @observer
 class ServiceWebview extends Component<IProps> {
   @observable webview: HTMLIFrameElement | null = null;
-
-  private iframeRef = createRef<HTMLIFrameElement>();
 
   constructor(props: IProps) {
     super(props);

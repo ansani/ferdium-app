@@ -10,7 +10,7 @@ import {
   LOCAL_SERVER,
 } from '../config';
 import { hash } from '../helpers/password-helpers';
-import { ipcInvoke, ipcOn, ipcSend } from '../tauri-ipc';
+import { ipcOn, ipcSend } from '../tauri-ipc';
 import TypedStore from './lib/TypedStore';
 
 const debug = require('../preload-safe-debug')('Ferdium:SettingsStore');
@@ -82,7 +82,7 @@ export default class SettingsStore extends TypedStore {
       }
     });
 
-    ipcOn('appSettings', (_, resp) => {
+    ipcOn<{ type: string; data: any }>('appSettings', (_, resp) => {
       // Lock on startup if enabled in settings
       if (
         !this.loaded &&

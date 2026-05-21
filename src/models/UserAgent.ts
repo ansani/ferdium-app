@@ -23,10 +23,10 @@ export default class UserAgent {
 
     observe(this, 'webview', change => {
       const { oldValue, newValue } = change;
-      if (oldValue !== null) {
+      if (oldValue != null) {
         this._removeWebviewEvents(oldValue);
       }
-      if (newValue !== null) {
+      if (newValue != null) {
         this._addWebviewEvents(newValue);
       }
     });

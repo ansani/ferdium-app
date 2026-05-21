@@ -6,7 +6,7 @@ import { needsToken } from '../api/apiBase';
 import { DEFAULT_SERVICE_ORDER, DEFAULT_SERVICE_SETTINGS } from '../config';
 import { todosStore } from '../features/todos';
 import { getFaviconUrl } from '../helpers/favicon-helpers';
-import { isValidExternalURL, normalizedUrl } from '../helpers/url-helpers';
+import { normalizedUrl } from '../helpers/url-helpers';
 import { ifUndefined } from '../jsUtils';
 import type { IRecipe } from './Recipe';
 import UserAgent from './UserAgent';
@@ -313,7 +313,7 @@ export default class Service {
     return this.canHibernate && this.isHibernationRequested;
   }
 
-  get webview(): HTMLIFrameElement | null {
+  get webview(): any {
     if (this.isTodosService) {
       return todosStore.webview as unknown as HTMLIFrameElement | null;
     }
@@ -406,7 +406,7 @@ export default class Service {
     return this.recipe.partition || `persist:service-${this.id}`;
   }
 
-  initializeWebViewEvents({ handleIPCMessage, openWindow, stores }): void {
+  initializeWebViewEvents({ handleIPCMessage }): void {
     // In Tauri, webview events are handled via postMessage/iframe messaging
     // instead of Electron's webContents API.
     this.userAgentModel.setWebviewReference(this.webview);
@@ -437,8 +437,11 @@ export default class Service {
     }
 
     if (this.webview) {
-      this.webview.addEventListener('message', async (event: MessageEvent) => {
-        const { channel, args } = event.data || {};
+      window.addEventListener('message', async (event: MessageEvent) => {
+        const { channel, args } = (event.data || {}) as {
+          channel?: string;
+          args?: any[];
+        };
         if (!channel) return;
         if (channel === 'inject-js-unsafe') {
           // Cannot execute JS in iframes cross-origin; no-op
@@ -483,6 +486,6 @@ export default class Service {
   }
 
   toggleToTalk(): void {
-    this.webview?.send('toggle-to-talk');
+    this.webview?.contentWindow?.postMessage({ channel: 'toggle-to-talk' }, '*');
   }
 }

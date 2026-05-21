@@ -53,12 +53,10 @@ class AuthLayout extends Component<IProps, IState> {
       isAPIHealthy,
       retryHealthCheck,
       isHealthCheckLoading,
-      isFullScreen,
       installAppUpdate,
       appUpdateIsDownloaded,
       updateVersion,
       intl,
-      isUpdateAvailable,
     } = this.props;
 
     let serverNameParse = serverName();

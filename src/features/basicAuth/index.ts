@@ -13,7 +13,7 @@ export default function initialize() {
     state,
   };
 
-  ipcOn('feature:basic-auth-request', (e, data) => {
+  ipcOn<{ authInfo: typeof state.authInfo }>('feature:basic-auth-request', (e, data) => {
     debug(e, data);
     state.authInfo = data.authInfo;
     state.isModalVisible = true;
