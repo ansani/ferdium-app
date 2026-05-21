@@ -50,7 +50,7 @@ If so, engage in the already existing discussion.
 
 ### Install system-level dependencies
 
-_Note:_ This list can likely get outdated. If so, please refer to the versions pinned in [`package.json`](./package.json) and the Tauri requirements in [`src-tauri/Cargo.toml`](./src-tauri/Cargo.toml).
+_Note:_ This list can likely get outdated. If so, please refer to the versions pinned in [`package.json`](./package.json) and the official Tauri prerequisites documentation: <https://v2.tauri.app/start/prerequisites/>.
 
 #### Node.js, pnpm
 
@@ -171,7 +171,7 @@ Please use the `src/preload-safe-debug` module instead of importing `debug` dire
 If you want to self-sign on a mac with non-registered certificate (not for distribution of the resulting package), configure code-signing in `src-tauri/tauri.conf.json` and run the following command from the repository root (with the Tauri CLI installed):
 
 ```bash
-cargo tauri build --bundles app
+cd src-tauri && cargo tauri build --bundles app
 ```
 
 ## Release

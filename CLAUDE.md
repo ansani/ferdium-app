@@ -11,9 +11,9 @@ Ferdium is a Tauri desktop app that aggregates messaging services (Slack, WhatsA
 ```bash
 pnpm install              # Install dependencies (requires Node 22.18.0, pnpm 10.14.0)
 pnpm dev                  # Start esbuild in watch mode (serves on http://127.0.0.1:8080)
-pnpm start                # Launch Tauri with built app (run after dev or build)
-pnpm start:all-dev        # Dev + Tauri together (waits for dev server, then launches)
-pnpm debug                # Same as start:all-dev but with DEBUG=Ferdium:* logging
+pnpm start                # Run Tauri in development mode (tauri dev)
+pnpm start:all-dev        # Same as pnpm start (tauri dev)
+pnpm debug                # Same as pnpm start:all-dev but with DEBUG=Ferdium:* logging
 
 pnpm test                 # Run Jest tests with coverage
 pnpm test:watch           # Jest in watch mode
@@ -36,7 +36,7 @@ pnpm build                # Production build: esbuild + tauri build
 ### Process Model (Tauri)
 
 - **Tauri backend** (`src-tauri/src/main.rs`): App lifecycle, native plugin wiring, command registration, and window setup
-- **Frontend bootstrap** (`src/index.ts` + `src/app.tsx`): React UI initialization, MobX stores, routing, and renderer logic
+- **Frontend bootstrap** (`src/app.tsx`): React UI initialization, MobX stores, routing, and renderer logic
 
 ### State Management (MobX)
 
@@ -91,6 +91,7 @@ Each feature in `src/features/` is self-contained with its own store, components
 - `src/themes/` - Theme configs (dark, default, legacy)
 - `src/i18n/` - Translations (managed via `pnpm manage-translations`)
 - `src-tauri/` - Tauri Rust backend (command handlers, plugins, native integration)
+- `src/electron/` - Legacy Electron integration code (excluded from the current Tauri/esbuild build path)
 - `src/lib/` - System integrations (Menu, Tray, TouchBar, DBus)
 
 ### Build System
