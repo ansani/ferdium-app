@@ -65,7 +65,6 @@ const copyManualAssets = () => {
     fs.mkdirSync(outDir);
   }
   fs.copyFileSync('package.json', `${outDir}/package.json`);
-  fs.copyFileSync('electron-builder.npmrc', `${outDir}/.npmrc`);
 
   const buildInfoData = {
     timestamp: buildInfo.timestamp,
@@ -107,6 +106,12 @@ const runEsbuild = async () => {
     minifyIdentifiers: true,
     keepNames: true,
     outdir: outDir,
+    // Externalize legacy Electron packages - stubs provided by src/electron-util.ts
+    external: [
+      'electron',
+      '@electron/remote',
+      'react-electron-web-view',
+    ],
     watch: isDev && {
       onRebuild(error, result) {
         if (error) {
