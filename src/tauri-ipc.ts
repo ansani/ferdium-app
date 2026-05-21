@@ -7,6 +7,7 @@ const CHANNEL_TO_COMMAND: Record<string, string> = {
   updateAppSettings: 'update_app_settings',
   initialAppSettings: 'initial_app_settings',
   startLocalServer: 'start_local_server',
+  updateDBusUnread: 'update_dbus_unread',
   'get-dnd': 'get_dnd',
   'detect-language': 'detect_language',
   'download-file': 'download_file',
@@ -25,6 +26,28 @@ const CHANNEL_TO_COMMAND: Record<string, string> = {
 };
 
 /**
+ * Normalise variadic args into a single plain-object payload suitable for
+ * Tauri's invoke(). Rules:
+ *  - No args → empty object.
+ *  - Single plain-object arg → pass through as-is (named parameters).
+ *  - Anything else (primitives, arrays, multiple values) → wrap as { args }
+ *    so positional data is preserved; Rust commands must accept
+ *    `args: Vec<serde_json::Value>` for those cases.
+ */
+function normalisePayload(args: any[]): Record<string, unknown> {
+  if (args.length === 0) return {};
+  if (
+    args.length === 1 &&
+    typeof args[0] === 'object' &&
+    args[0] !== null &&
+    !Array.isArray(args[0])
+  ) {
+    return args[0] as Record<string, unknown>;
+  }
+  return { args };
+}
+
+/**
  * Invoke a Tauri command (replaces ipcRenderer.invoke)
  */
 export async function ipcInvoke<T = unknown>(
@@ -32,13 +55,7 @@ export async function ipcInvoke<T = unknown>(
   ...args: any[]
 ): Promise<T> {
   const command = CHANNEL_TO_COMMAND[channel] ?? toSnakeCase(channel);
-  const payload =
-    args.length === 1
-      ? args[0]
-      : args.length > 1
-        ? Object.assign({}, ...args)
-        : {};
-  return invoke<T>(command, payload);
+  return invoke<T>(command, normalisePayload(args));
 }
 
 /**
@@ -46,13 +63,7 @@ export async function ipcInvoke<T = unknown>(
  */
 export function ipcSend(channel: string, ...args: any[]): void {
   const command = CHANNEL_TO_COMMAND[channel] ?? toSnakeCase(channel);
-  const payload =
-    args.length === 1
-      ? args[0]
-      : args.length > 1
-        ? Object.assign({}, ...args)
-        : {};
-  invoke(command, payload).catch((err: unknown) => {
+  invoke(command, normalisePayload(args)).catch((err: unknown) => {
     console.warn(`[tauri-ipc] ipcSend(${channel}) failed:`, err);
   });
 }
@@ -89,18 +100,32 @@ export function ipcOn<T = unknown>(
 }
 
 /**
- * Listen to a Tauri event once (replaces ipcRenderer.once)
+ * Listen to a Tauri event once (replaces ipcRenderer.once).
+ * Uses the same "fired" + "cancelled" pattern as ipcOn so the listener is
+ * guaranteed to be unregistered even if the event fires before listen()
+ * resolves.
  */
 export function ipcOnce<T = unknown>(
   channel: string,
   callback: (event: any, data: T) => void,
 ): void {
   let unlisten: (() => void) | null = null;
+  let fired = false;
+
   listen<T>(channel, event => {
+    if (fired) return;
+    fired = true;
     callback(event, event.payload);
-    unlisten?.();
+    if (unlisten) {
+      unlisten();
+    }
+    // If unlisten is still null the .then() handler will clean up below
   }).then(fn => {
-    unlisten = fn;
+    if (fired) {
+      fn(); // event already handled – unregister immediately
+    } else {
+      unlisten = fn;
+    }
   });
 }
 

@@ -67,6 +67,8 @@ export default class ServicesStore extends TypedStore {
 
   private toggleToTalkCallback = () => this.active?.toggleToTalk();
 
+  private _unlistenToggleToTalk: (() => void) | null = null;
+
   constructor(stores: Stores, api: ApiInterface, actions: Actions) {
     super(stores, api, actions);
 
@@ -241,7 +243,7 @@ export default class ServicesStore extends TypedStore {
   initialize() {
     super.initialize();
 
-    ipcOn('toggle-to-talk', this.toggleToTalkCallback);
+    this._unlistenToggleToTalk = ipcOn('toggle-to-talk', this.toggleToTalkCallback);
 
     // Check services to become hibernated
     this.serviceMaintenanceTick();
@@ -250,7 +252,10 @@ export default class ServicesStore extends TypedStore {
   teardown() {
     super.teardown();
 
-    // Note: ipcOn listeners are cleaned up automatically by the Tauri event system
+    if (this._unlistenToggleToTalk) {
+      this._unlistenToggleToTalk();
+      this._unlistenToggleToTalk = null;
+    }
 
     // Stop checking services for hibernation
     this.serviceMaintenanceTick.cancel();
@@ -751,6 +756,7 @@ export default class ServicesStore extends TypedStore {
   }
 
   @action _detachService({ service }) {
+    service.detachMessageHandler();
     // eslint-disable-next-line no-param-reassign
     service.webview = null;
     // eslint-disable-next-line no-param-reassign
@@ -1343,12 +1349,11 @@ export default class ServicesStore extends TypedStore {
         unreadDirectMessageCount,
         unreadIndirectMessageCount,
       });
-      ipcSend(
-        'updateDBusUnread',
-        unreadDirectMessageCount,
-        unreadIndirectMessageCount,
+      ipcSend('updateDBusUnread', {
+        direct: unreadDirectMessageCount,
+        indirect: unreadIndirectMessageCount,
         unreadServices,
-      );
+      });
     }
   }
 

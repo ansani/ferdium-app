@@ -32,6 +32,9 @@ export default class Service {
 
   events = {};
 
+  // Stored to allow cleanup on detach
+  _messageHandler: ((event: MessageEvent) => void) | null = null;
+
   @observable isAttached: boolean = false;
 
   @observable isActive: boolean = false; // Is current webview active
@@ -437,7 +440,10 @@ export default class Service {
     }
 
     if (this.webview) {
-      window.addEventListener('message', async (event: MessageEvent) => {
+      this._messageHandler = async (event: MessageEvent) => {
+        // Only process messages from this service's iframe
+        if (event.source !== this.webview?.contentWindow) return;
+
         const { channel, args } = (event.data || {}) as {
           channel?: string;
           args?: any[];
@@ -452,7 +458,8 @@ export default class Service {
             args,
           });
         }
-      });
+      };
+      window.addEventListener('message', this._messageHandler);
     }
 
     if (this.webview) {
@@ -486,6 +493,17 @@ export default class Service {
   }
 
   toggleToTalk(): void {
-    this.webview?.contentWindow?.postMessage({ channel: 'toggle-to-talk' }, '*');
+    const webview = this.webview;
+    if (!webview?.contentWindow) return;
+    const targetOrigin =
+      webview.src ? new URL(webview.src).origin : window.location.origin;
+    webview.contentWindow.postMessage({ channel: 'toggle-to-talk' }, targetOrigin);
+  }
+
+  detachMessageHandler(): void {
+    if (this._messageHandler) {
+      window.removeEventListener('message', this._messageHandler);
+      this._messageHandler = null;
+    }
   }
 }

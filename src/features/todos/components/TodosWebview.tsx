@@ -76,6 +76,8 @@ class TodosWebview extends Component<IProps, IState> {
 
   private webview: HTMLIFrameElement | null = null;
 
+  private _messageHandler: ((e: MessageEvent) => void) | null = null;
+
   constructor(props: IProps) {
     super(props);
 
@@ -160,17 +162,23 @@ class TodosWebview extends Component<IProps, IState> {
     }
 
     const { handleClientMessage } = this.props;
-    window.addEventListener('message', (e: MessageEvent) => {
+    this._messageHandler = (e: MessageEvent) => {
+      // Only process messages from this todos iframe
+      if (e.source !== this.webview?.contentWindow) return;
       const { channel, args } = (e.data || {}) as {
         channel?: string;
         args?: any[];
       };
       if (channel) handleClientMessage(channel, args?.[0]);
-    });
+    };
+    window.addEventListener('message', this._messageHandler);
   };
 
   stopListeningToIpcMessages = (): void => {
-    // In Tauri with iframes, cleanup is handled via component unmount
+    if (this._messageHandler) {
+      window.removeEventListener('message', this._messageHandler);
+      this._messageHandler = null;
+    }
   };
 
   render(): ReactElement {

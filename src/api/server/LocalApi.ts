@@ -9,18 +9,16 @@ const debug = require('../../preload-safe-debug')('Ferdium:LocalApi');
 export default class LocalApi {
   // Settings
   getAppSettings(type: string) {
-    return new Promise(resolve => {
-      // Settings are loaded via the Tauri backend command
-      ipcSend('getAppSettings', type);
-      // Resolve with empty settings; SettingsStore will update via ipcOn('appSettings')
-      resolve({ type, data: {} });
+    // Invoke the Tauri command and return the actual settings data
+    return ipcInvoke<{ type: string; data: any }>('getAppSettings', {
+      settingsType: type,
     });
   }
 
   async updateAppSettings(type: string, data: any) {
     debug('LocalApi::updateAppSettings resolves', type, data);
     ipcSend('updateAppSettings', {
-      type,
+      settingsType: type,
       data,
     });
   }

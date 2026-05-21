@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { invoke } from '@tauri-apps/api/core';
 import {
   DEV_API_FRANZ_WEBSITE,
   DEV_FRANZ_API,
@@ -11,11 +12,27 @@ import {
   LOCAL_WS_API,
 } from './config';
 
-// Version and locale are provided by the Tauri runtime / browser APIs
-export const ferdiumVersion: string =
-  (globalThis as any).__TAURI_APP_VERSION__ ?? '7.1.3';
-export const ferdiumLocale: string =
+// Version and locale are fetched from the Tauri runtime.
+// We initialise with safe fallbacks and update asynchronously; callers that
+// need the definitive value should await getVersion()/getLocale().
+let _ferdiumVersion = '0.0.0';
+let _ferdiumLocale =
   (typeof navigator !== 'undefined' && navigator.language) || 'en-US';
+
+invoke<string>('get_version')
+  .then(v => {
+    _ferdiumVersion = v;
+  })
+  .catch(() => {});
+
+invoke<string>('get_locale')
+  .then(l => {
+    _ferdiumLocale = l;
+  })
+  .catch(() => {});
+
+export const ferdiumVersion: string = _ferdiumVersion;
+export const ferdiumLocale: string = _ferdiumLocale;
 
 // Stub app object for compatibility with code that still imports { app }
 export const app = {

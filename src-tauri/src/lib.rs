@@ -68,6 +68,7 @@ pub fn run() {
             commands::relaunch_app,
             commands::get_translation_cache,
             commands::set_auto_launch,
+            commands::update_dbus_unread,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

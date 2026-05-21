@@ -22,14 +22,14 @@ pub fn get_app_settings(
 ) -> AppSettingsResponse {
     let settings = state.settings.lock().unwrap();
     AppSettingsResponse {
-        r#type: settings_type,
+        r#type: settings_type.clone(),
         data: settings.all_serialized(),
     }
 }
 
 #[tauri::command]
 pub fn update_app_settings(
-    _settings_type: String,
+    settings_type: String,
     data: Value,
     state: State<AppState>,
 ) {
@@ -37,11 +37,12 @@ pub fn update_app_settings(
     if let Some(obj) = data.as_object() {
         settings.set(obj.clone());
     }
+    let _ = settings_type;
 }
 
 #[tauri::command]
 pub fn initial_app_settings(
-    _settings_type: String,
+    settings_type: String,
     data: Value,
     state: State<AppState>,
 ) {
@@ -49,6 +50,7 @@ pub fn initial_app_settings(
     if let Some(obj) = data.as_object() {
         settings.set(obj.clone());
     }
+    let _ = settings_type;
 }
 
 #[tauri::command]
@@ -64,7 +66,7 @@ pub async fn start_local_server(
         }
     }
 
-    let port = crate::server::find_free_port(45569);
+    let port = crate::server::find_free_port(45569)?;
     let token = generate_token();
 
     {
@@ -214,6 +216,18 @@ pub fn set_auto_launch(enabled: bool, app: AppHandle) -> Result<(), String> {
     } else {
         autostart.disable().map_err(|e| e.to_string())
     }
+}
+
+#[tauri::command]
+pub fn update_dbus_unread(
+    _direct: u32,
+    _indirect: u32,
+    _unread_services: Value,
+) {
+    // On platforms with D-Bus support this would update the taskbar badge via
+    // the com.canonical.Unity.LauncherEntry D-Bus API.  For now this is a
+    // no-op stub that correctly accepts the typed arguments sent from the
+    // frontend so that Tauri's argument deserialization succeeds.
 }
 
 fn generate_token() -> String {

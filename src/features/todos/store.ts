@@ -187,10 +187,16 @@ export default class TodoStore extends FeatureStore {
   @action _handleHostMessage = message => {
     debug('_handleHostMessage', message);
     if (message.action === 'todos:create' && this.webview?.contentWindow) {
-      // Use postMessage for iframe communication
+      // Scope the message to the todos iframe's origin when possible
+      let targetOrigin = '*';
+      try {
+        if (this.todoUrl) targetOrigin = new URL(this.todoUrl).origin;
+      } catch {
+        // fall back to '*' if the URL is not parseable
+      }
       this.webview.contentWindow.postMessage(
         { channel: IPC.TODOS_HOST_CHANNEL, args: [message] },
-        '*',
+        targetOrigin,
       );
     }
   };

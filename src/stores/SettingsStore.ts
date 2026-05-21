@@ -101,11 +101,11 @@ export default class SettingsStore extends TypedStore {
         data: resp.data,
       });
       this.setLoaded();
-      ipcSend('initialAppSettings', resp);
+      ipcSend('initialAppSettings', { settingsType: resp.type, data: resp.data });
     });
 
     for (const type of this.fileSystemSettingsTypes) {
-      ipcSend('getAppSettings', type);
+      ipcSend('getAppSettings', { settingsType: type });
     }
   }
 
@@ -161,7 +161,7 @@ export default class SettingsStore extends TypedStore {
     if (this.fileSystemSettingsTypes.includes(type)) {
       debug('Update settings on file system', type, data);
       ipcSend('updateAppSettings', {
-        type,
+        settingsType: type,
         data,
       });
 
