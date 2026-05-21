@@ -90,7 +90,7 @@ Each feature in `src/features/` is self-contained with its own store, components
 - `src/helpers/` - Utility functions (URL, validation, userAgent, i18n)
 - `src/themes/` - Theme configs (dark, default, legacy)
 - `src/i18n/` - Translations (managed via `pnpm manage-translations`)
-- `src-tauri/` - Tauri Rust backend (commands, plugins, app capabilities)
+- `src-tauri/` - Tauri Rust backend (app lifecycle, window setup, commands, plugins, capabilities)
 - `src/lib/` - System integrations (Menu, Tray, TouchBar, DBus)
 
 ### Build System
