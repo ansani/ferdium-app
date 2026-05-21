@@ -150,7 +150,7 @@ pnpm debug
 ```
 
 Note: please prefer [`debug()`](https://github.com/visionmedia/debug) over `console.log()`.
-Please use the `src/preload-safe-debug` module instead of importing `debug` directly, so debug initialization remains consistent between preload/runtime contexts.
+Please use the `src/preload-safe-debug` module instead of importing `debug` directly, so debug initialization stays consistent across the app.
 
 ### Styleguide
 
