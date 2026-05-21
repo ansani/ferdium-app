@@ -59,20 +59,32 @@ export function ipcSend(channel: string, ...args: any[]): void {
 
 /**
  * Listen to a Tauri event (replaces ipcRenderer.on).
- * Returns a cleanup function.
+ * Returns a cleanup function. The cleanup is async-safe: if called before
+ * the listen promise resolves, it will cancel the listener once set.
  */
 export function ipcOn<T = unknown>(
   channel: string,
   callback: (event: any, data: T) => void,
 ): () => void {
   let unlisten: (() => void) | null = null;
+  let cancelled = false;
+
   listen<T>(channel, event => {
     callback(event, event.payload);
   }).then(fn => {
-    unlisten = fn;
+    if (cancelled) {
+      fn();
+    } else {
+      unlisten = fn;
+    }
   });
+
   return () => {
-    unlisten?.();
+    if (unlisten) {
+      unlisten();
+    } else {
+      cancelled = true;
+    }
   };
 }
 

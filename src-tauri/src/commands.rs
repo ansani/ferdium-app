@@ -217,14 +217,8 @@ pub fn set_auto_launch(enabled: bool, app: AppHandle) -> Result<(), String> {
 }
 
 fn generate_token() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.subsec_nanos())
-        .unwrap_or(12_345);
-    format!(
-        "{:x}{:x}",
-        nanos,
-        nanos.wrapping_mul(1_664_525_u32).wrapping_add(1_013_904_223_u32)
-    )
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    let bytes: [u8; 16] = rng.gen();
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
