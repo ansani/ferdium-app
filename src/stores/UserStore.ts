@@ -1,4 +1,4 @@
-import { ipcRenderer } from 'electron';
+import { ipcSend } from '../tauri-ipc';
 import jwt from 'jsonwebtoken';
 import { action, computed, makeObservable, observable } from 'mobx';
 import localStorage from 'mobx-localstorage';
@@ -257,7 +257,7 @@ export default class UserStore extends TypedStore {
     this.stores.services.allServicesRequest.invalidate().reset();
 
     if (this.stores.todos.isTodosEnabled) {
-      ipcRenderer.send('clear-storage-data', { sessionId: TODOS_PARTITION_ID });
+      ipcSend('clear-storage-data', { sessionId: TODOS_PARTITION_ID });
     }
   }
 

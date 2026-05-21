@@ -1,10 +1,12 @@
-import type { Response } from 'electron';
 import { action, makeObservable, observable } from 'mobx';
 import type { Stores } from '../@types/stores.types';
 import type { Actions } from '../actions/lib/actions';
 import type { ApiInterface } from '../api';
 import Request from './lib/Request';
 import TypedStore from './lib/TypedStore';
+
+// Replace Electron's Response type with the browser's built-in Response
+type Response = globalThis.Response;
 
 interface Message {
   type: 'error' | 'log' | 'info';

@@ -1,6 +1,4 @@
-import { systemPreferences } from '@electron/remote';
 import { mdiGithub, mdiOpenInNew, mdiPowerPlug } from '@mdi/js';
-import { ipcRenderer } from 'electron';
 import { noop } from 'lodash';
 import { observer } from 'mobx-react';
 import prettyBytes from 'pretty-bytes';
@@ -47,6 +45,7 @@ import Icon from '../../ui/icon';
 import Input from '../../ui/input/index';
 import Toggle from '../../ui/toggle';
 import SandboxServiceTabs from '../SandboxServiceTabs';
+import { ipcInvoke } from '../../../tauri-ipc';
 
 const debug = require('../../../preload-safe-debug')(
   'Ferdium:EditSettingsForm',
@@ -1011,7 +1010,7 @@ class EditSettingsForm extends Component<IProps, IState> {
                 <Toggle {...form.$('isLockingFeatureEnabled').bind()} />
                 {isLockingFeatureEnabled && (
                   <>
-                    {isMac && systemPreferences.canPromptTouchID() && (
+                    {isMac && false && (  // Touch ID not supported in Tauri yet
                       <Toggle {...form.$('useTouchIdToUnlock').bind()} />
                     )}
 
@@ -1174,8 +1173,7 @@ class EditSettingsForm extends Component<IProps, IState> {
                     )}
                     className="settings__open-settings-cache-button"
                     onClick={e => {
-                      ipcRenderer
-                        .invoke('download-folder-select')
+                      ipcInvoke<string | null>('download-folder-select')
                         .then(path => {
                           if (path) {
                             form.$('downloadFolderPath').set(path);

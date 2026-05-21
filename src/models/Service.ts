@@ -1,13 +1,9 @@
-import { basename, join } from 'node:path';
-import { webContents } from '@electron/remote';
-import { ipcRenderer } from 'electron';
+import { join } from 'node:path';
 import { action, autorun, computed, makeObservable, observable } from 'mobx';
-import type ElectronWebView from 'react-electron-web-view';
+import { ipcSend } from '../tauri-ipc';
 
-import { v4 as uuidV4 } from 'uuid';
 import { needsToken } from '../api/apiBase';
 import { DEFAULT_SERVICE_ORDER, DEFAULT_SERVICE_SETTINGS } from '../config';
-import { isMac } from '../environment';
 import { todosStore } from '../features/todos';
 import { getFaviconUrl } from '../helpers/favicon-helpers';
 import { isValidExternalURL, normalizedUrl } from '../helpers/url-helpers';
@@ -16,10 +12,6 @@ import type { IRecipe } from './Recipe';
 import UserAgent from './UserAgent';
 
 const debug = require('../preload-safe-debug')('Ferdium:Service');
-
-// Global registry for active partitions
-// This is needed to prevent events of the same partition from being registered multiple times (when using custom sandboxes)
-const activePartitions = new Set<string>();
 
 interface DarkReaderInterface {
   brightness: number;
@@ -33,7 +25,8 @@ export default class Service {
 
   recipe: IRecipe;
 
-  _webview: ElectronWebView | null = null;
+  // In Tauri, services are rendered in iframes instead of Electron webviews
+  _webview: HTMLIFrameElement | null = null;
 
   timer: NodeJS.Timeout | null = null;
 
@@ -320,9 +313,9 @@ export default class Service {
     return this.canHibernate && this.isHibernationRequested;
   }
 
-  get webview(): ElectronWebView | null {
+  get webview(): HTMLIFrameElement | null {
     if (this.isTodosService) {
-      return todosStore.webview;
+      return todosStore.webview as unknown as HTMLIFrameElement | null;
     }
 
     return this._webview;
@@ -414,10 +407,8 @@ export default class Service {
   }
 
   initializeWebViewEvents({ handleIPCMessage, openWindow, stores }): void {
-    const webviewWebContents = webContents.fromId(
-      this.webview.getWebContentsId(),
-    );
-
+    // In Tauri, webview events are handled via postMessage/iframe messaging
+    // instead of Electron's webContents API.
     this.userAgentModel.setWebviewReference(this.webview);
 
     // If the recipe has implemented 'modifyRequestHeaders',
@@ -425,7 +416,7 @@ export default class Service {
     if (typeof this.recipe.modifyRequestHeaders === 'function') {
       const modifiedRequestHeaders = this.recipe.modifyRequestHeaders();
       debug(this.name, 'modifiedRequestHeaders', modifiedRequestHeaders);
-      ipcRenderer.send('modifyRequestHeaders', {
+      ipcSend('modifyRequestHeaders', {
         modifiedRequestHeaders,
         serviceId: this.id,
       });
@@ -437,7 +428,7 @@ export default class Service {
     if (typeof this.recipe.knownCertificateHosts === 'function') {
       const knownHosts = this.recipe.knownCertificateHosts();
       debug(this.name, 'knownCertificateHosts', knownHosts);
-      ipcRenderer.send('knownCertificateHosts', {
+      ipcSend('knownCertificateHosts', {
         knownHosts,
         serviceId: this.id,
       });
@@ -445,225 +436,32 @@ export default class Service {
       debug(this.name, 'knownCertificateHosts is not defined in the recipe');
     }
 
-    this.webview.addEventListener('ipc-message', async e => {
-      if (e.channel === 'inject-js-unsafe') {
-        await Promise.all(
-          e.args.map(script =>
-            this.webview.executeJavaScript(
-              `"use strict"; (() => { ${script} })();`,
-            ),
-          ),
-        );
-      } else {
-        handleIPCMessage({
-          serviceId: this.id,
-          channel: e.channel,
-          args: e.args,
-        });
-      }
-    });
-
-    this.webview.addEventListener(
-      'new-window',
-      (event, url, frameName, options) => {
-        debug('new-window', event, url, frameName, options);
-        if (!isValidExternalURL(event.url)) {
-          return;
-        }
-        if (
-          event.disposition === 'foreground-tab' ||
-          event.disposition === 'background-tab'
-        ) {
-          openWindow({
-            event,
-            url,
-            frameName,
-            options,
-          });
+    if (this.webview) {
+      this.webview.addEventListener('message', async (event: MessageEvent) => {
+        const { channel, args } = event.data || {};
+        if (!channel) return;
+        if (channel === 'inject-js-unsafe') {
+          // Cannot execute JS in iframes cross-origin; no-op
         } else {
-          ipcRenderer.send('open-browser-window', {
-            url: event.url,
+          handleIPCMessage({
             serviceId: this.id,
+            channel,
+            args,
           });
         }
-      },
-    );
-
-    this.webview.addEventListener('did-start-loading', event => {
-      debug('Did start load', this.name, event);
-
-      this._didStartLoading();
-    });
-
-    this.webview.addEventListener('did-stop-loading', event => {
-      debug('Did stop load', this.name, event);
-
-      this._didStopLoading();
-    });
-
-    // eslint-disable-next-line unicorn/consistent-function-scoping
-    const didLoad = () => {
-      this._didLoad();
-    };
-
-    this.webview.addEventListener('did-frame-finish-load', didLoad.bind(this));
-    this.webview.addEventListener('did-navigate', didLoad.bind(this));
-
-    this.webview.addEventListener('did-fail-load', event => {
-      debug('Service failed to load', this.name, event);
-      if (
-        event.isMainFrame &&
-        event.errorCode !== -21 &&
-        event.errorCode !== -3
-      ) {
-        this._didFailLoad(event);
-      }
-    });
-
-    this.webview.addEventListener('crashed', () => {
-      debug('Service crashed', this.name);
-      this._hasCrashed();
-    });
-
-    this.webview.addEventListener('found-in-page', ({ result }) => {
-      debug('Found in page', result);
-      this.webview.send('found-in-page', result);
-    });
-
-    this.webview.addEventListener('media-started-playing', event => {
-      debug('Started Playing media', this.name, event);
-      this._didMediaPlaying();
-    });
-
-    this.webview.addEventListener('media-paused', event => {
-      debug('Stopped Playing media', this.name, event);
-      this._didMediaPaused();
-    });
-
-    if (webviewWebContents) {
-      // This is needed to prevent events of the same partition from being registered multiple times (when using custom sandboxes)
-      const webviewPartition = webviewWebContents.session.getStoragePath();
-      if (webviewPartition) {
-        // Check if the partition is already active
-        if (activePartitions.has(webviewPartition)) {
-          return;
-        }
-
-        // Add the partition to the active partitions
-        activePartitions.add(webviewPartition);
-      }
-      // -----
-
-      // TODO: Modify this logic once https://github.com/electron/electron/issues/40674 is fixed
-      // This is a workaround for the issue where the zoom in shortcut is not working
-      if (!isMac) {
-        webviewWebContents.on('before-input-event', (event, input) => {
-          if (input.control && input.key === '+' && input.type === 'keyDown') {
-            event.preventDefault();
-            const currentZoom = this.webview?.getZoomLevel();
-            this.webview?.setZoomLevel(currentZoom + 0.5);
-          }
-        });
-      }
-
-      webviewWebContents.session.on('will-download', (event, item) => {
-        event.preventDefault();
-
-        const downloadId = uuidV4();
-
-        window['ferdium'].actions.app.addDownload({
-          id: downloadId,
-          serviceId: this.id,
-          filename: item.getFilename(),
-          url: item.getURL(),
-          savePath: item.getSavePath(),
-        });
-
-        item.addListener('updated', (event, state) => {
-          if (state === 'interrupted') {
-            debug('Download is interrupted but can be resumed');
-          } else if (state === 'progressing') {
-            if (item.isPaused()) {
-              debug('Download is paused');
-            } else {
-              debug(`Received bytes: ${item.getReceivedBytes()}`);
-            }
-          }
-          window['ferdium'].actions.app.updateDownload({
-            id: downloadId,
-            serviceId: this.id,
-            filename: basename(item.getSavePath()),
-            url: item.getURL(),
-            savePath: item.getSavePath(),
-            receivedBytes: item.getReceivedBytes(),
-            totalBytes: item.getTotalBytes(),
-            state,
-          });
-          debug('download updated', event, state);
-        });
-        item.addListener('done', (event, state) => {
-          debug('download done', event, state);
-          if (state === 'completed') {
-            debug('Download successfully');
-          } else {
-            if (state === 'cancelled' && item.getSavePath() === '') {
-              window['ferdium'].actions.app.removeDownload(downloadId);
-              debug('Download is cancelled');
-            }
-            debug(`Download failed: ${state}`);
-          }
-
-          window['ferdium'].actions.app.endedDownload({
-            id: downloadId,
-            serviceId: this.id,
-            receivedBytes: item.getReceivedBytes(),
-            totalBytes: item.getTotalBytes(),
-            state,
-          });
-        });
-
-        ipcRenderer.on('toggle-pause-download', (_, data) => {
-          debug('toggle-pause-download', item.isPaused(), item.getState());
-          if (data.downloadId === downloadId || data.downloadId === undefined) {
-            if (item.isPaused()) {
-              item.resume();
-            } else {
-              item.pause();
-            }
-          }
-          debug('toggle-pause-download', item.isPaused(), item.getState());
-          window['ferdium'].actions.app.updateDownload({
-            id: downloadId,
-            paused: item.isPaused(),
-          });
-        });
-
-        ipcRenderer.on('stop-download', (_, data) => {
-          if (data === undefined || downloadId === data.downloadId) {
-            item.cancel();
-          }
-        });
       });
-      webviewWebContents.on('login', (event, _, authInfo, callback) => {
-        // const authCallback = callback;
-        debug('browser login event', authInfo);
-        event.preventDefault();
+    }
 
-        if (authInfo.isProxy && authInfo.scheme === 'basic') {
-          debug('Sending service echo ping');
-          webviewWebContents.send('get-service-id');
+    if (this.webview) {
+      // iframe load/error events (replaces Electron webview events)
+      this.webview.addEventListener('load', () => {
+        this._didLoad();
+        this._didStopLoading();
+      });
 
-          debug('Received service id', this.id);
-
-          const ps = stores.settings.proxy[this.id];
-
-          if (ps) {
-            debug('Sending proxy auth callback for service', this.id);
-            callback(ps.user, ps.password);
-          } else {
-            debug('No proxy auth config found for', this.id);
-          }
-        }
+      this.webview.addEventListener('error', event => {
+        debug('Service failed to load', this.name, event);
+        this._hasCrashed();
       });
     }
   }

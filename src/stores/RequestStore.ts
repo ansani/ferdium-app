@@ -1,4 +1,4 @@
-import { ipcRenderer } from 'electron';
+import { ipcOn } from '../tauri-ipc';
 import { action, computed, makeObservable, observable } from 'mobx';
 import ms from 'ms';
 
@@ -46,7 +46,7 @@ export default class RequestStore extends TypedStore {
     this.userInfoRequest = this.stores.user.getUserInfoRequest;
     this.servicesRequest = this.stores.services.allServicesRequest;
 
-    ipcRenderer.on('localServerPort', (_, data) => {
+    ipcOn('localServerPort', (_, data) => {
       this.setData(data);
     });
   }

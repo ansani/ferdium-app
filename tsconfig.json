@@ -5,7 +5,17 @@
   "exclude": [
     "node_modules",
     "build",
-    "recipes"
+    "recipes",
+    "src/index.ts",
+    "src/electron",
+    "src/enforce-macos-app-location.ts",
+    "src/lib/Tray.ts",
+    "src/lib/Menu.ts",
+    "src/lib/TouchBar.ts",
+    "src/lib/DBus.ts",
+    "src/lib/dbus",
+    "src/features/todos/preload.ts",
+    "src/webview"
   ],
   "compilerOptions": {
     "outDir": ".tmp",

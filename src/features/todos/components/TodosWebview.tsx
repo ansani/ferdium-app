@@ -6,9 +6,7 @@ import {
   type ReactElement,
   createRef,
 } from 'react';
-import Webview from 'react-electron-web-view';
 import withStyles, { type WithStylesProps } from 'react-jss';
-import { TODOS_PARTITION_ID } from '../../../config';
 import type { TodoClientMessage } from '../actions';
 
 const styles = theme => ({
@@ -56,7 +54,7 @@ interface IProps extends WithStylesProps<typeof styles> {
   isTodosServiceActive: boolean;
   isVisible: boolean;
   handleClientMessage: (channel: string, message: TodoClientMessage) => void;
-  setTodosWebview: (webView: Webview) => void;
+  setTodosWebview: (webView: HTMLIFrameElement) => void;
   resize: (newWidth: number) => void;
   width: number;
   minWidth: number;
@@ -76,7 +74,7 @@ interface IState {
 class TodosWebview extends Component<IProps, IState> {
   private node = createRef<HTMLDivElement>();
 
-  private webview: Webview;
+  private webview: HTMLIFrameElement | null = null;
 
   constructor(props: IProps) {
     super(props);
@@ -162,18 +160,14 @@ class TodosWebview extends Component<IProps, IState> {
     }
 
     const { handleClientMessage } = this.props;
-    this.webview.addEventListener('ipc-message', e => {
-      handleClientMessage(e.channel, e.args[0]);
+    this.webview.addEventListener('message', (e: MessageEvent) => {
+      const { channel, args } = e.data || {};
+      if (channel) handleClientMessage(channel, args?.[0]);
     });
   };
 
   stopListeningToIpcMessages = (): void => {
-    if (!this.webview) {
-      return;
-    }
-
-    const { handleClientMessage } = this.props;
-    this.webview.removeEventListener('ipc-message', handleClientMessage);
+    // In Tauri with iframes, cleanup is handled via component unmount
   };
 
   render(): ReactElement {
@@ -222,21 +216,21 @@ class TodosWebview extends Component<IProps, IState> {
           />
         )}
         {isTodoUrlValid && (
-          <Webview
-            // className={classes.webview} // TODO: [TS DEBT] style not found
-            onDidAttach={() => {
-              const { setTodosWebview } = this.props;
-              setTodosWebview(this.webview);
-              this.startListeningToIpcMessages();
-            }}
-            partition={TODOS_PARTITION_ID}
-            preload="./features/todos/preload.js"
-            ref={webview => {
-              this.webview = webview ? webview.view : null;
-            }}
-            useragent={userAgent}
+          <iframe
+            title="Ferdium Todos"
+            style={{ width: '100%', height: '100%', border: 'none' }}
             src={todoUrl}
-            allowpopups
+            sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-top-navigation allow-top-navigation-by-user-activation allow-downloads"
+            ref={el => {
+              this.webview = el;
+              if (el) {
+                const { setTodosWebview } = this.props;
+                setTodosWebview(el);
+                el.addEventListener('load', () => {
+                  this.startListeningToIpcMessages();
+                });
+              }
+            }}
           />
         )}
       </div>

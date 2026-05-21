@@ -1,7 +1,5 @@
-import { Menu } from '@electron/remote';
 import { mdiApps } from '@mdi/js';
 import classnames from 'classnames';
-import type { MenuItemConstructorOptions } from 'electron';
 import { noop } from 'lodash';
 import { observer } from 'mobx-react';
 import { Component, type MouseEventHandler, type ReactElement } from 'react';
@@ -129,21 +127,19 @@ class WorkspaceDrawerItem extends Component<IProps> {
 
     const compactClass = isCompact ? 'compact' : '';
 
-    const contextMenuTemplate: MenuItemConstructorOptions[] = [
+    const contextMenuTemplate = [
       {
         label: name,
         enabled: false,
       },
       {
-        type: 'separator',
+        type: 'separator' as const,
       },
       {
         label: intl.formatMessage(messages.contextMenuEdit),
         click: onContextMenuEditClick || noop,
       },
     ];
-
-    const contextMenu = Menu.buildFromTemplate(contextMenuTemplate);
 
     return (
       // eslint-disable-next-line jsx-a11y/no-static-element-interactions
@@ -154,9 +150,10 @@ class WorkspaceDrawerItem extends Component<IProps> {
           compactClass,
         ])}
         onClick={onClick}
-        onContextMenu={() => {
+        onContextMenu={e => {
           if (onContextMenuEditClick) {
-            contextMenu.popup();
+            e.preventDefault();
+            onContextMenuEditClick();
           }
         }}
         onKeyDown={noop}

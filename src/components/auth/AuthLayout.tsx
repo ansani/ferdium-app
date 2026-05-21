@@ -1,6 +1,4 @@
 import { mdiFlash } from '@mdi/js';
-import type { Response } from 'electron';
-import { TitleBar } from 'electron-react-titlebar/renderer';
 import { observer } from 'mobx-react';
 import {
   Component,
@@ -11,7 +9,6 @@ import {
 import { type WrappedComponentProps, injectIntl } from 'react-intl';
 import { serverName } from '../../api/apiBase';
 import { GITHUB_FERDIUM_URL } from '../../config';
-import { isSnap, isWindows } from '../../environment';
 import { Component as PublishDebugInfo } from '../../features/publishDebugInfo';
 import { updateVersionParse } from '../../helpers/update-helpers';
 import globalMessages from '../../i18n/globalMessages';
@@ -22,7 +19,7 @@ import Icon from '../ui/icon';
 
 export interface IProps extends WrappedComponentProps {
   children: ReactElement;
-  error: Response;
+  error: globalThis.Response;
   isOnline: boolean;
   isAPIHealthy: boolean;
   retryHealthCheck: MouseEventHandler<HTMLButtonElement>;
@@ -70,12 +67,6 @@ class AuthLayout extends Component<IProps, IState> {
 
     return (
       <>
-        {isWindows && !isFullScreen && (
-          <TitleBar
-            menu={window['ferdium'].menu.template}
-            icon="assets/images/logo.svg"
-          />
-        )}
         <div className="auth">
           {!isOnline && (
             <InfoBar type="warning">
@@ -83,7 +74,7 @@ class AuthLayout extends Component<IProps, IState> {
               {intl.formatMessage(globalMessages.notConnectedToTheInternet)}
             </InfoBar>
           )}
-          {(appUpdateIsDownloaded || (isSnap && isUpdateAvailable)) &&
+          {appUpdateIsDownloaded &&
             this.state.shouldShowAppUpdateInfoBar && (
               <AppUpdateInfoBar
                 onInstallUpdate={installAppUpdate}

@@ -1,5 +1,4 @@
 import PropTypes from 'prop-types';
-import type { Webview } from 'react-electron-web-view';
 import { createActionsFromDefinitions } from '../../actions/lib/actions';
 
 export interface TodoClientMessage {
@@ -11,7 +10,7 @@ interface TodoActionsType {
   resize: (width: number) => void;
   toggleTodosPanel: () => void;
   toggleTodosFeatureVisibility: () => void;
-  setTodosWebview: (webview: Webview) => void;
+  setTodosWebview: (webview: HTMLIFrameElement) => void;
   handleHostMessage: (action: string, data: object) => void;
   handleClientMessage: (channel: string, message: TodoClientMessage) => void;
   openDevTools: () => void;

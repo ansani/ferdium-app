@@ -1,6 +1,5 @@
 import { action, computed, makeObservable, observable } from 'mobx';
 import localStorage from 'mobx-localstorage';
-import type { Webview } from 'react-electron-web-view';
 import type { Actions } from '../../actions/lib/actions';
 
 import {
@@ -31,7 +30,7 @@ export default class TodoStore extends FeatureStore {
 
   @observable isFeatureActive = false;
 
-  @observable webview: Webview | undefined;
+  @observable webview: HTMLIFrameElement | undefined;
 
   @observable userAgentModel = new UserAgent();
 
@@ -187,8 +186,12 @@ export default class TodoStore extends FeatureStore {
 
   @action _handleHostMessage = message => {
     debug('_handleHostMessage', message);
-    if (message.action === 'todos:create') {
-      this.webview.send(IPC.TODOS_HOST_CHANNEL, message);
+    if (message.action === 'todos:create' && this.webview?.contentWindow) {
+      // Use postMessage for iframe communication
+      this.webview.contentWindow.postMessage(
+        { channel: IPC.TODOS_HOST_CHANNEL, args: [message] },
+        '*',
+      );
     }
   };
 
@@ -238,19 +241,15 @@ export default class TodoStore extends FeatureStore {
 
   _openDevTools = () => {
     debug('_openDevTools');
-
-    const webview = document.querySelector<Webview>('#todos-panel webview');
-    if (webview) {
-      webview.openDevTools();
-    }
+    // DevTools for iframes are not directly accessible in Tauri
   };
 
   _reload = () => {
     debug('_reload');
 
-    const webview = document.querySelector<Webview>('#todos-panel webview');
+    const webview = document.querySelector<HTMLIFrameElement>('#todos-panel iframe');
     if (webview) {
-      webview.reload();
+      webview.src = webview.src; // eslint-disable-line no-self-assign
     }
   };
 
@@ -260,26 +259,32 @@ export default class TodoStore extends FeatureStore {
     const { authToken } = this.stores.user;
     const { isDarkThemeActive } = this.stores.ui;
     const { locale } = this.stores.app;
-    if (!this.webview) return;
-    await this.webview.send(IPC.TODOS_HOST_CHANNEL, {
-      action: 'todos:configure',
-      data: {
-        authToken,
-        locale,
-        theme: isDarkThemeActive ? ThemeType.dark : ThemeType.default,
+    if (!this.webview?.contentWindow) return;
+    // Use postMessage for iframe communication
+    this.webview.contentWindow.postMessage(
+      {
+        channel: IPC.TODOS_HOST_CHANNEL,
+        args: [{
+          action: 'todos:configure',
+          data: {
+            authToken,
+            locale,
+            theme: isDarkThemeActive ? ThemeType.dark : ThemeType.default,
+          },
+        }],
       },
-    });
+      '*',
+    );
 
     if (!this.isInitialized) {
-      this.webview.addEventListener('new-window', this._handleNewWindowEvent);
-
       this.isInitialized = true;
     }
   };
 
   _goToService = ({ url, serviceId }) => {
     if (url) {
-      this.stores.services.one(serviceId).webview.loadURL(url);
+      const webview = this.stores.services.one(serviceId).webview as HTMLIFrameElement | null;
+      if (webview) webview.src = url;
     }
     if (this.actions) {
       this.actions.service.setActive({ serviceId });

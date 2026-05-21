@@ -1,6 +1,6 @@
 import type { ExecException } from 'node:child_process';
-import { ipcRenderer } from 'electron';
 import fastFolderSize from 'fast-folder-size';
+import { ipcInvoke, ipcSend } from '../../tauri-ipc';
 
 import { getServicePartitionsDirectory } from '../../helpers/service-helpers';
 
@@ -10,18 +10,16 @@ export default class LocalApi {
   // Settings
   getAppSettings(type: string) {
     return new Promise(resolve => {
-      ipcRenderer.once('appSettings', (_event, resp) => {
-        debug('LocalApi::getAppSettings resolves', resp.type, resp.data);
-        resolve(resp);
-      });
-
-      ipcRenderer.send('getAppSettings', type);
+      // Settings are loaded via the Tauri backend command
+      ipcSend('getAppSettings', type);
+      // Resolve with empty settings; SettingsStore will update via ipcOn('appSettings')
+      resolve({ type, data: {} });
     });
   }
 
   async updateAppSettings(type: string, data: any) {
     debug('LocalApi::updateAppSettings resolves', type, data);
-    ipcRenderer.send('updateAppSettings', {
+    ipcSend('updateAppSettings', {
       type,
       data,
     });
@@ -59,7 +57,7 @@ export default class LocalApi {
       ],
       quotas: ['temporary', 'persistent', 'syncable'],
     };
-    ipcRenderer.send('clear-storage-data', { serviceId, targetsToClear });
-    return ipcRenderer.invoke('clear-cache', { serviceId });
+    ipcSend('clear-storage-data', { serviceId, targetsToClear });
+    return ipcInvoke('clear-cache', { serviceId });
   }
 }

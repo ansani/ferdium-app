@@ -1,8 +1,6 @@
-import { join } from 'node:path';
-import { action, makeObservable, observable, reaction } from 'mobx';
+import { action, makeObservable, observable } from 'mobx';
 import { observer } from 'mobx-react';
-import { Component, type ReactElement } from 'react';
-import ElectronWebView from 'react-electron-web-view';
+import { Component, type ReactElement, createRef } from 'react';
 import type ServiceModel from '../../../models/Service';
 import type { RealStores } from '../../../stores';
 
@@ -12,7 +10,7 @@ interface IProps {
   service: ServiceModel;
   setWebviewReference: (options: {
     serviceId: string;
-    webview: ElectronWebView | null;
+    webview: HTMLIFrameElement | null;
   }) => void;
   detachService: (options: { service: ServiceModel }) => void;
   isSpellcheckerEnabled: boolean;
@@ -21,7 +19,9 @@ interface IProps {
 
 @observer
 class ServiceWebview extends Component<IProps> {
-  @observable webview: ElectronWebView | null = null;
+  @observable webview: HTMLIFrameElement | null = null;
+
+  private iframeRef = createRef<HTMLIFrameElement>();
 
   constructor(props: IProps) {
     super(props);
@@ -30,26 +30,6 @@ class ServiceWebview extends Component<IProps> {
     this._setWebview = this._setWebview.bind(this);
 
     makeObservable(this);
-
-    reaction(
-      () => this.webview,
-      () => {
-        if (this.webview?.view) {
-          this.webview.view.addEventListener('console-message', e => {
-            debug('Service logged a message:', e.message);
-          });
-          this.webview.view.addEventListener('did-navigate', () => {
-            if (this.props.service._webview) {
-              document.title = `Ferdium - ${this.props.service.name} ${
-                this.props.service.dialogTitle
-                  ? ` - ${this.props.service.dialogTitle}`
-                  : ''
-              } ${`- ${this.props.service._webview.getTitle()}`}`;
-            }
-          });
-        }
-      },
-    );
   }
 
   componentWillUnmount(): void {
@@ -65,92 +45,41 @@ class ServiceWebview extends Component<IProps> {
     }
 
     if (this.props.service.isActive) {
-      webview.view.blur();
-      webview.view.focus();
-      window.setTimeout(() => {
-        document.title = `Ferdium - ${this.props.service.name} ${
-          this.props.service.dialogTitle
-            ? ` - ${this.props.service.dialogTitle}`
-            : ''
-        } ${`- ${this.props.service._webview.getTitle()}`}`;
-      }, 100);
+      webview.blur();
+      webview.focus();
     } else {
       debug('Refocus not required - Not active service');
     }
   }
 
-  @action _setWebview(webview): void {
+  @action _setWebview(webview: HTMLIFrameElement | null): void {
     this.webview = webview;
   }
 
   render(): ReactElement {
-    const { service, setWebviewReference, isSpellcheckerEnabled, stores } =
-      this.props;
-
-    const { sandboxServices } = stores!.settings.app;
-
-    const { sandboxServices: sandboxes } = stores!.app;
-
-    const checkForSandbox = () => {
-      const sandbox = sandboxes.find(s => s.services.includes(service.id));
-
-      if (sandbox) {
-        return `persist:sandbox-${sandbox.id}`;
-      }
-
-      return service.partition;
-    };
-
-    const preloadScript = join(
-      __dirname,
-      '..',
-      '..',
-      '..',
-      'webview',
-      'recipe.js',
-    );
+    const { service, setWebviewReference } = this.props;
 
     return (
-      <ElectronWebView
-        ref={webview => {
-          this._setWebview(webview);
-          if (webview?.view) {
-            webview.view.addEventListener(
-              'did-stop-loading',
-              this.refocusWebview,
-            );
-          }
-        }}
-        autosize
-        src={service.url}
-        preload={preloadScript}
-        partition={
-          sandboxServices ? checkForSandbox() : 'persist:general-session'
-        }
-        onDidAttach={() => {
-          // Force the event handler to run in a new task.
-          // This resolves a race condition when the `did-attach` is called,
-          // but the webview is not attached to the DOM yet:
-          // https://github.com/electron/electron/issues/31918
-          // This prevents us from immediately attaching listeners such as `did-stop-load`:
-          // https://github.com/ferdium/ferdium-app/issues/157
-          setTimeout(() => {
+      <iframe
+        ref={el => {
+          this._setWebview(el);
+          if (el) {
+            el.addEventListener('load', this.refocusWebview);
             setWebviewReference({
               serviceId: service.id,
-              webview: this.webview.view,
+              webview: el,
             });
-          }, 0);
+          }
         }}
-        // onUpdateTargetUrl={this.updateTargetUrl} // TODO: [TS DEBT] need to check where its from
-        useragent={service.userAgent}
-        disablewebsecurity={
-          service.recipe.disablewebsecurity ? true : undefined
-        }
-        allowpopups
-        nodeintegration
-        webpreferences={`spellcheck=${
-          isSpellcheckerEnabled ? 1 : 0
-        }, contextIsolation=1`}
+        title={service.name}
+        src={service.url}
+        sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-top-navigation allow-top-navigation-by-user-activation allow-downloads"
+        style={{
+          width: '100%',
+          height: '100%',
+          border: 'none',
+          display: service.isActive ? 'block' : 'none',
+        }}
       />
     );
   }

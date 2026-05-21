@@ -1,19 +1,11 @@
 import { URL } from 'node:url';
-import {
-  app,
-  getCurrentWindow,
-  nativeTheme,
-  powerMonitor,
-  process as remoteProcess,
-  screen,
-} from '@electron/remote';
 import AutoLaunch from 'auto-launch';
-import { ipcRenderer } from 'electron';
-import { readJsonSync, readdirSync, writeJsonSync } from 'fs-extra';
 import { action, computed, makeObservable, observable } from 'mobx';
 import moment from 'moment';
 import ms from 'ms';
 import { v4 as uuidV4 } from 'uuid';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { ipcInvoke, ipcOn, ipcSend } from '../tauri-ipc';
 
 import type { Stores } from '../@types/stores.types';
 import type { Actions } from '../actions/lib/actions';
@@ -22,7 +14,6 @@ import { CHECK_INTERVAL, DEFAULT_APP_SETTINGS } from '../config';
 import {
   electronVersion,
   isMac,
-  isWinPortable,
   osRelease,
 } from '../environment';
 import {
@@ -44,13 +35,8 @@ import TypedStore from './lib/TypedStore';
 
 const debug = require('../preload-safe-debug')('Ferdium:AppStore');
 
-const mainWindow = getCurrentWindow();
-
-const executablePath = isMac
-  ? remoteProcess.execPath
-  : isWinPortable
-    ? process.env.PORTABLE_EXECUTABLE_FILE
-    : process.execPath;
+// Use Tauri window API for window events; start with fullscreen from document
+const executablePath = process.execPath;
 const autoLauncher = new AutoLaunch({
   name: 'Ferdium',
   path: executablePath,
@@ -125,7 +111,7 @@ export default class AppStore extends TypedStore {
 
   @observable isClearingAllCache = false;
 
-  @observable isFullScreen = mainWindow.isFullScreen();
+  @observable isFullScreen = Boolean(document.fullscreenElement);
 
   @observable isFocused = true;
 
@@ -203,11 +189,9 @@ export default class AppStore extends TypedStore {
       this.isOnline = false;
     });
 
-    mainWindow.on('enter-full-screen', () => {
-      this.isFullScreen = true;
-    });
-    mainWindow.on('leave-full-screen', () => {
-      this.isFullScreen = false;
+    // Full-screen events via browser fullscreenchange
+    window.addEventListener('fullscreenchange', () => {
+      this.isFullScreen = Boolean(document.fullscreenElement);
     });
 
     this.isOnline = navigator.onLine;
@@ -234,14 +218,11 @@ export default class AppStore extends TypedStore {
     setInterval(() => this._checkForUpdates(), CHECK_INTERVAL);
     // Check for an update in 30s (need a delay to prevent Squirrel Installer lock file issues)
     setTimeout(() => this._checkForUpdates(), ms('30s'));
-    ipcRenderer.on('autoUpdate', (_, data) => {
+    ipcOn('autoUpdate', (_, data) => {
       if (this.updateStatus !== this.updateStatusTypes.FAILED) {
         if (data.available) {
           this.updateVersion = data.version;
           this.updateStatus = this.updateStatusTypes.AVAILABLE;
-          if (isMac && this.stores.settings.app.automaticUpdates) {
-            app.dock?.bounce();
-          }
         }
 
         if (data.available !== undefined && !data.available) {
@@ -250,9 +231,6 @@ export default class AppStore extends TypedStore {
 
         if (data.downloaded) {
           this.updateStatus = this.updateStatusTypes.DOWNLOADED;
-          if (isMac && this.stores.settings.app.automaticUpdates) {
-            app.dock?.bounce();
-          }
         }
 
         if (data.error) {
@@ -271,7 +249,7 @@ export default class AppStore extends TypedStore {
     });
 
     // Handle deep linking (ferdium://)
-    ipcRenderer.on('navigateFromDeepLink', (_, data) => {
+    ipcOn('navigateFromDeepLink', (_, data) => {
       debug('Navigate from deep link', data);
       let { url } = data;
       if (!url) return;
@@ -296,7 +274,7 @@ export default class AppStore extends TypedStore {
       this.stores.router.push(url);
     });
 
-    ipcRenderer.on('muteApp', () => {
+    ipcOn('muteApp', () => {
       this._toggleMuteApp();
     });
 
@@ -306,37 +284,38 @@ export default class AppStore extends TypedStore {
       this._healthCheck();
     }, 1000);
 
-    this.isSystemDarkModeEnabled = nativeTheme.shouldUseDarkColors;
+    this.isSystemDarkModeEnabled =
+      window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-    ipcRenderer.on('isWindowFocused', (_, isFocused) => {
+    ipcOn('isWindowFocused', (_, isFocused) => {
       debug('Setting is focused to', isFocused);
       this.isFocused = isFocused;
     });
 
-    powerMonitor.on('suspend', () => {
-      debug('System suspended starting timer');
+    // Power suspend/resume via Page Visibility API
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        debug('System suspended starting timer');
+        this.timeSuspensionStart = moment();
+      } else {
+        debug('System resumed, last suspended on', this.timeSuspensionStart);
+        this.actions.service.resetLastPollTimer();
 
-      this.timeSuspensionStart = moment();
-    });
+        const idleTime = this.stores.settings.app.reloadAfterResumeTime;
 
-    powerMonitor.on('resume', () => {
-      debug('System resumed, last suspended on', this.timeSuspensionStart);
-      this.actions.service.resetLastPollTimer();
+        if (
+          this.timeSuspensionStart.add(idleTime, 'm').isBefore(moment()) &&
+          this.stores.settings.app.reloadAfterResume
+        ) {
+          debug('Reloading services, user info and features');
 
-      const idleTime = this.stores.settings.app.reloadAfterResumeTime;
-
-      if (
-        this.timeSuspensionStart.add(idleTime, 'm').isBefore(moment()) &&
-        this.stores.settings.app.reloadAfterResume
-      ) {
-        debug('Reloading services, user info and features');
-
-        setInterval(() => {
-          debug('Reload app interval is starting');
-          if (this.isOnline) {
-            window.location.reload();
-          }
-        }, ms('2s'));
+          setInterval(() => {
+            debug('Reload app interval is starting');
+            if (this.isOnline) {
+              window.location.reload();
+            }
+          }, ms('2s'));
+        }
       }
     });
 
@@ -374,45 +353,41 @@ export default class AppStore extends TypedStore {
     this._readSandboxes();
 
     // Check partitions of the sandboxes that no longer exist
-    const dir = readdirSync(userDataPath('Partitions'));
-    dir
-      .filter(d => d.startsWith('sandbox-'))
-      .forEach(d => {
-        if (
-          !this.sandboxServices.some(s =>
-            s.id.includes(d.replace('sandbox-', '')),
-          )
-        ) {
-          try {
-            removeServicePartitionDirectory(d);
-          } catch (error) {
-            console.error(
-              'Error while checking service partition directory -',
-              error,
-            );
+    try {
+      const { readdirSync } = require('fs-extra');
+      const dir = readdirSync(userDataPath('Partitions'));
+      dir
+        .filter((d: string) => d.startsWith('sandbox-'))
+        .forEach((d: string) => {
+          if (
+            !this.sandboxServices.some(s =>
+              s.id.includes(d.replace('sandbox-', '')),
+            )
+          ) {
+            try {
+              removeServicePartitionDirectory(d);
+            } catch (error) {
+              console.error(
+                'Error while checking service partition directory -',
+                error,
+              );
+            }
           }
-        }
-      });
-
-    // Check if services in sandboxes still exists, if so, remove their partitions (NOT WORKING!)
-    // this.sandboxServices.forEach(sandbox => {
-    //   sandbox.services.forEach(serviceId => {
-    //     try {
-    //       removeServicePartitionDirectory(serviceId, true);
-    //     } catch (error) {
-    //       console.error(
-    //         'Error while checking service partition directory -',
-    //         error,
-    //       );
-    //     }
-    //   });
-    // });
+        });
+    } catch {
+      // Partitions directory may not exist yet
+    }
   }
 
   _readSandboxes() {
-    this.sandboxServices = readJsonSync(
-      userDataPath('config', 'sandboxes.json'),
-    );
+    try {
+      const { readJsonSync } = require('fs-extra');
+      this.sandboxServices = readJsonSync(
+        userDataPath('config', 'sandboxes.json'),
+      );
+    } catch {
+      this.sandboxServices = [];
+    }
   }
 
   _writeSandboxes() {
@@ -424,10 +399,15 @@ export default class AppStore extends TypedStore {
       ),
     }));
 
-    writeJsonSync(
-      userDataPath('config', 'sandboxes.json'),
-      this.sandboxServices,
-    );
+    try {
+      const { writeJsonSync } = require('fs-extra');
+      writeJsonSync(
+        userDataPath('config', 'sandboxes.json'),
+        this.sandboxServices,
+      );
+    } catch (error) {
+      console.error('Error writing sandboxes config', error);
+    }
   }
 
   @computed get cacheSize() {
@@ -475,7 +455,14 @@ export default class AppStore extends TypedStore {
           id: workspace.id,
           services: workspace.services,
         })),
-        windowSettings: readJsonSync(userDataPath('window-state.json')),
+        windowSettings: (() => {
+          try {
+            const { readJsonSync } = require('fs-extra');
+            return readJsonSync(userDataPath('window-state.json'));
+          } catch {
+            return {};
+          }
+        })(),
         settings,
         features: this.stores.features.features,
         user: this.stores.user.data.id,
@@ -513,13 +500,11 @@ export default class AppStore extends TypedStore {
           serviceId,
         });
 
-        if (!mainWindow.isVisible()) {
-          mainWindow.show();
+        if (document.hidden) {
+          const win = getCurrentWindow();
+          win.show();
+          win.setFocus();
         }
-        if (mainWindow.isMinimized()) {
-          mainWindow.restore();
-        }
-        mainWindow.focus();
 
         debug('Notification click handler');
       }
@@ -540,7 +525,7 @@ export default class AppStore extends TypedStore {
       indicator = Number.parseInt(indicator, 10);
     }
 
-    ipcRenderer.send('updateAppIndicator', {
+    ipcSend('updateAppIndicator', {
       indicator,
     });
   }
@@ -570,7 +555,7 @@ export default class AppStore extends TypedStore {
     if (this.isOnline && this.stores.settings.app.automaticUpdates) {
       debug('_checkForUpdates: sending event to autoUpdate:check');
       this.updateStatus = this.updateStatusTypes.CHECKING;
-      ipcRenderer.send('autoUpdate', {
+      ipcSend('autoUpdate', {
         action: 'check',
       });
     }
@@ -582,7 +567,7 @@ export default class AppStore extends TypedStore {
 
   @action _installUpdate() {
     debug('_installUpdate: sending event to autoUpdate:install');
-    ipcRenderer.send('autoUpdate', {
+    ipcSend('autoUpdate', {
       action: 'install',
     });
   }
@@ -721,13 +706,13 @@ export default class AppStore extends TypedStore {
   }
 
   @action _stopDownload(downloadId: string | undefined) {
-    ipcRenderer.send('stop-download', {
+    ipcSend('stop-download', {
       downloadId,
     });
   }
 
   @action _togglePauseDownload(downloadId: string | undefined) {
-    ipcRenderer.send('toggle-pause-download', {
+    ipcSend('toggle-pause-download', {
       downloadId,
     });
   }
@@ -848,7 +833,7 @@ export default class AppStore extends TypedStore {
 
   async _systemDND() {
     debug('Checking if Do Not Disturb Mode is on');
-    const dnd = await ipcRenderer.invoke('get-dnd');
+    const dnd = await ipcInvoke<boolean>('get-dnd');
     debug('Do not disturb mode is', dnd);
     if (
       dnd !== this.stores.settings.all.app.isAppMuted &&

@@ -87,8 +87,24 @@ const runEsbuild = async () => {
   }
   copyManualAssets();
 
-  // Source files
-  const entryPoints = await glob('./src/**/*.{ts,tsx,js,jsx}');
+  // Source files (exclude Electron main-process files, now handled by Rust/Tauri)
+  const mainProcessExcludes = new Set([
+    'src/index.ts',
+    'src/enforce-macos-app-location.ts',
+    'src/lib/Tray.ts',
+    'src/lib/Menu.ts',
+    'src/lib/TouchBar.ts',
+    'src/lib/DBus.ts',
+  ]);
+  const allEntryPoints = await glob('./src/**/*.{ts,tsx,js,jsx}');
+  const entryPoints = allEntryPoints.filter(
+    (f) =>
+      !mainProcessExcludes.has(f.replace(/^\.\//, '')) &&
+      !f.startsWith('./src/electron/') &&
+      !f.startsWith('./src/lib/dbus/') &&
+      !f.startsWith('./src/webview/') &&
+      f !== './src/features/todos/preload.ts',
+  );
 
   // Scss entry points
   entryPoints.push(
@@ -106,12 +122,6 @@ const runEsbuild = async () => {
     minifyIdentifiers: true,
     keepNames: true,
     outdir: outDir,
-    // Externalize legacy Electron packages - stubs provided by src/electron-util.ts
-    external: [
-      'electron',
-      '@electron/remote',
-      'react-electron-web-view',
-    ],
     watch: isDev && {
       onRebuild(error, result) {
         if (error) {

@@ -1,4 +1,3 @@
-import { getCurrentWindow } from '@electron/remote';
 import { compact, invoke, noop } from 'lodash';
 import { reaction } from 'mobx';
 import { inject, observer } from 'mobx-react';
@@ -256,8 +255,8 @@ class QuickSwitchModal extends Component<IProps, IState> {
     if (isModalVisible && !this.state.wasPrevVisible) {
       // Set focus back on current window if its in a service
       // TODO: Find a way to gain back focus
-      getCurrentWindow().blurWebView();
-      getCurrentWindow().webContents.focus();
+      // In Tauri, blurring webview is handled differently; focus the window
+      window.focus();
 
       // The input "focus" attribute will only work on first modal open
       // Manually add focus to the input element

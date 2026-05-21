@@ -1,4 +1,3 @@
-import { Menu, app, dialog } from '@electron/remote';
 import { mdiExclamation, mdiVolumeSource } from '@mdi/js';
 import classnames from 'classnames';
 import { noop } from 'lodash';
@@ -18,8 +17,16 @@ import { altKey, cmdOrCtrlShortcutKey, shiftKey } from '../../../environment';
 import globalMessages from '../../../i18n/globalMessages';
 import type Service from '../../../models/Service';
 import Icon from '../../ui/icon';
-import MenuItemConstructorOptions = Electron.MenuItemConstructorOptions;
 import { acceleratorString, isShiftKeyPress } from '../../../jsUtils';
+
+// Context menu item structure (replaces Electron's MenuItemConstructorOptions)
+interface ContextMenuItem {
+  label?: string;
+  enabled?: boolean;
+  type?: 'separator';
+  click?: () => void;
+  accelerator?: string;
+}
 
 const IS_SERVICE_DEBUGGING_ENABLED = (
   localStorage.getItem('debug') || ''
@@ -259,7 +266,7 @@ class TabItem extends Component<IProps, IState> {
     } = this.props;
     const { intl } = this.props;
 
-    const menuTemplate: MenuItemConstructorOptions[] = [
+    const menuTemplate: ContextMenuItem[] = [
       {
         label: service.name || service.recipe.name,
         enabled: false,
@@ -336,25 +343,58 @@ class TabItem extends Component<IProps, IState> {
       {
         label: intl.formatMessage(messages.deleteService),
         click: () => {
-          // @ts-expect-error Fix me
-          const selection = dialog.showMessageBoxSync(app.mainWindow, {
-            type: 'question',
-            message: intl.formatMessage(messages.deleteService),
-            detail: intl.formatMessage(messages.confirmDeleteService, {
+          // Use browser's built-in confirm dialog instead of Electron's
+          const confirmed = window.confirm(
+            `${intl.formatMessage(messages.deleteService)}\n${intl.formatMessage(messages.confirmDeleteService, {
               serviceName: service.name || service.recipe.name,
-            }),
-            buttons: [
-              intl.formatMessage(globalMessages.yes),
-              intl.formatMessage(globalMessages.no),
-            ],
-          });
-          if (selection === 0) {
+            })}`,
+          );
+          if (confirmed) {
             deleteService();
           }
         },
       },
     ];
-    const menu = Menu.buildFromTemplate(menuTemplate);
+    // Show a simple browser-native context menu by executing click handlers
+    // In a future version this can be replaced with a proper context menu component
+    const showContextMenu = (e: React.MouseEvent) => {
+      e.preventDefault();
+      // Build a simple dropdown by using the first actionable item's click handler
+      // For now, we trigger the context-menu items via keyboard or show them inline
+      // This is a best-effort fallback; a full context-menu UI can be added separately
+      const menuEl = document.createElement('div');
+      menuEl.className = 'native-context-menu';
+      menuEl.style.cssText =
+        'position:fixed;background:#fff;border:1px solid #ccc;z-index:9999;list-style:none;padding:4px 0;min-width:200px;box-shadow:2px 2px 6px rgba(0,0,0,.3)';
+      menuEl.style.left = `${e.clientX}px`;
+      menuEl.style.top = `${e.clientY}px`;
+      for (const item of menuTemplate) {
+        if (item.type === 'separator') {
+          const sep = document.createElement('hr');
+          sep.style.margin = '4px 0';
+          menuEl.append(sep);
+        } else if (item.label) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = item.label;
+          btn.style.cssText =
+            'display:block;width:100%;text-align:left;padding:4px 12px;background:none;border:none;cursor:pointer;';
+          btn.disabled = item.enabled === false;
+          if (item.click)
+            btn.addEventListener('click', () => {
+              item.click!();
+              menuEl.remove();
+            });
+          menuEl.append(btn);
+        }
+      }
+      document.body.append(menuEl);
+      const cleanup = () => {
+        menuEl.remove();
+        document.removeEventListener('click', cleanup);
+      };
+      setTimeout(() => document.addEventListener('click', cleanup), 0);
+    };
 
     const showNotificationBadge =
       (showMessageBadgeWhenMutedSetting || service.isNotificationEnabled) &&
@@ -383,7 +423,7 @@ class TabItem extends Component<IProps, IState> {
         onClick={clickHandler}
         onKeyDown={noop}
         role="presentation"
-        onContextMenu={() => menu.popup()}
+        onContextMenu={showContextMenu}
         data-tooltip-id="tooltip-sidebar-button"
         data-tooltip-content={`${service.name} ${acceleratorString({
           index: shortcutIndex,

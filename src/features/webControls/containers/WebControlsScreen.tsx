@@ -7,18 +7,12 @@ import {
 } from 'mobx';
 import { inject, observer } from 'mobx-react';
 import { Component, type ReactElement } from 'react';
-import type ElectronWebView from 'react-electron-web-view';
 import type { StoresProps } from '../../../@types/ferdium-components.types';
 import { SEARCH_ENGINE_URLS } from '../../../config';
 import type Service from '../../../models/Service';
 import WebControls from '../components/WebControls';
 
-const URL_EVENTS = [
-  'load-commit',
-  'will-navigate',
-  'did-navigate',
-  'did-navigate-in-page',
-];
+const URL_EVENTS = ['load'];
 
 interface IProps extends Partial<StoresProps> {
   service: Service;
@@ -33,7 +27,7 @@ class WebControlsScreen extends Component<IProps> {
 
   @observable canGoForward = false;
 
-  webview: ElectronWebView | null = null;
+  webview: HTMLIFrameElement | null = null;
 
   autorunDisposer: IReactionDisposer | null = null;
 
@@ -48,11 +42,12 @@ class WebControlsScreen extends Component<IProps> {
 
     this.autorunDisposer = autorun(() => {
       if (service.isAttached) {
-        this.webview = service.webview;
-        this._setUrl(this.webview.getURL());
-
-        for (const event of URL_EVENTS) {
-          this.webview.addEventListener(event, this.handleWebviewEvent);
+        this.webview = service.webview as HTMLIFrameElement | null;
+        if (this.webview) {
+          this._setUrl(this.webview.src);
+          for (const event of URL_EVENTS) {
+            this.webview.addEventListener(event, this.handleWebviewEvent);
+          }
         }
       }
     });
@@ -70,54 +65,45 @@ class WebControlsScreen extends Component<IProps> {
     }
   }
 
-  handleWebviewEvent = (e: any) => {
-    if (!e.isMainFrame) {
-      return;
+  handleWebviewEvent = (_e: any) => {
+    if (this.webview) {
+      this._setUrl(this.webview.src);
     }
-    this._setUrlAndHistory(e.url);
   };
 
   @action
-  _setUrl(value): void {
+  _setUrl(value: string): void {
     this.url = value;
   }
 
   @action
-  _setUrlAndHistory(value): void {
+  _setUrlAndHistory(value: string): void {
     this._setUrl(value);
-    this.canGoBack = this.webview.canGoBack();
-    this.canGoForward = this.webview.canGoForward();
+    // iframes don't expose history state - keep defaults
+    this.canGoBack = false;
+    this.canGoForward = false;
   }
 
   goHome(): void {
     if (!this.webview) {
       return;
     }
-    this.webview.goToIndex(0);
+    // Reload to original src
+    this.webview.src = this.webview.src;
   }
 
   reload(): void {
     if (!this.webview) {
       return;
     }
-
-    this.webview.reload();
+    this.webview.src = this.webview.src;
   }
 
   goBack(): void {
-    if (!this.webview) {
-      return;
-    }
-
-    this.webview.goBack();
+    // iframes don't support programmatic history navigation
   }
 
   goForward(): void {
-    if (!this.webview) {
-      return;
-    }
-
-    this.webview.goForward();
   }
 
   navigate(url: string): void {
@@ -140,8 +126,10 @@ class WebControlsScreen extends Component<IProps> {
             });
     }
 
-    this.webview.loadURL(url);
-    this._setUrl(url);
+    if (this.webview) {
+      this.webview.src = url;
+      this._setUrl(url);
+    }
   }
 
   openInBrowser(): void {

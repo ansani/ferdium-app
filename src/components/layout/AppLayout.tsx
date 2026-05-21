@@ -1,5 +1,3 @@
-import { ipcRenderer } from 'electron';
-import { TitleBar } from 'electron-react-titlebar/renderer';
 import { observer } from 'mobx-react';
 import type React from 'react';
 import { Component, type PropsWithChildren } from 'react';
@@ -19,7 +17,8 @@ import { updateVersionParse } from '../../helpers/update-helpers';
 import InfoBar from '../ui/InfoBar';
 import ErrorBoundary from '../util/ErrorBoundary';
 
-import { isMac, isSnap, isWindows } from '../../environment';
+import { isMac, isWindows } from '../../environment';
+import { ipcSend } from '../../tauri-ipc';
 import Todos from '../../features/todos/containers/TodosScreen';
 import { workspaceStore } from '../../features/workspaces';
 import WorkspaceSwitchingIndicator from '../../features/workspaces/components/WorkspaceSwitchingIndicator';
@@ -87,7 +86,7 @@ const styles = (theme: {
 });
 
 const toggleFullScreen = () => {
-  ipcRenderer.send('window.toolbar-double-clicked');
+  ipcSend('window.toolbar-double-clicked');
 };
 
 interface IProps extends WrappedComponentProps, WithStylesProps<typeof styles> {
@@ -159,12 +158,6 @@ class AppLayout extends Component<PropsWithChildren<IProps>, IState> {
           <div
             className={`app ${useCompactWorkspaceDrawer ? 'app--compact-workspace' : ''}`}
           >
-            {isWindows && !isFullScreen && (
-              <TitleBar
-                menu={window['ferdium'].menu.template}
-                icon="assets/images/logo.svg"
-              />
-            )}
             {isMac && !isFullScreen && (
               <span
                 onDoubleClick={toggleFullScreen}
@@ -221,7 +214,7 @@ class AppLayout extends Component<PropsWithChildren<IProps>, IState> {
                     </InfoBar>
                   )}
                 {automaticUpdates &&
-                  (appUpdateIsDownloaded || (isSnap && isUpdateAvailable)) &&
+                  appUpdateIsDownloaded &&
                   this.state.shouldShowAppUpdateInfoBar && (
                     <AppUpdateInfoBar
                       onInstallUpdate={installAppUpdate}

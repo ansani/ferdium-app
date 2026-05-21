@@ -1,4 +1,3 @@
-import { session } from '@electron/remote';
 import { action, autorun, observable } from 'mobx';
 
 const debug = require('../../preload-safe-debug')(
@@ -28,8 +27,6 @@ export default function init(stores: {
     debug('Service Proxy autorun');
 
     for (const service of services) {
-      const s = session.fromPartition(`persist:service-${service.id}`);
-
       if (config.isEnabled) {
         const serviceProxyConfig = proxySettings[service.id];
 
@@ -38,17 +35,11 @@ export default function init(stores: {
             serviceProxyConfig.port ? `:${serviceProxyConfig.port}` : ''
           }`;
           debug(
-            `Setting proxy config from service settings for "${service.name}" (${service.id}) to`,
+            `Proxy config for "${service.name}" (${service.id}):`,
             proxyHost,
           );
-
-          s.setProxy({ proxyRules: proxyHost })
-            .then(() => {
-              debug(
-                `Using proxy "${proxyHost}" for "${service.name}" (${service.id})`,
-              );
-            })
-            .catch(error => console.error(error));
+          // Note: In Tauri, per-service proxy configuration is handled at the
+          // Rust/WebviewWindow level. This is a no-op placeholder.
         }
       }
     }

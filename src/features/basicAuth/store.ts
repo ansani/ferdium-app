@@ -1,5 +1,5 @@
-import { ipcRenderer } from 'electron';
 import { observable } from 'mobx';
+import { ipcSend } from '../../tauri-ipc';
 
 const debug = require('../../preload-safe-debug')('Ferdium:feature:basicAuth');
 
@@ -28,7 +28,7 @@ export const resetState = () => {
 export const sendCredentials = (user: any, password: any) => {
   debug('Sending credentials to main', user, password);
 
-  ipcRenderer.send('feature-basic-auth-credentials', {
+  ipcSend('feature-basic-auth-credentials', {
     user,
     password,
   });
@@ -37,5 +37,5 @@ export const sendCredentials = (user: any, password: any) => {
 export const cancelLogin = () => {
   debug('Cancel basic auth event');
 
-  ipcRenderer.send('feature-basic-auth-cancel');
+  ipcSend('feature-basic-auth-cancel');
 };
