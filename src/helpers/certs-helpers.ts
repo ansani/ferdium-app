@@ -1,11 +1,16 @@
 import { X509Certificate } from 'node:crypto';
 import { join } from 'node:path';
-import type { Certificate } from 'electron';
 import { ensureDirSync, readFileSync, readdirSync } from 'fs-extra';
 import { userDataCertsPath } from '../environment-remote';
 import { removeNewLines } from '../jsUtils';
 
 const debug = require('../preload-safe-debug')('Ferdium:App');
+
+// Certificate type equivalent (replaces Electron's Certificate type)
+interface Certificate {
+  data: string;
+  issuerCert?: Certificate;
+}
 
 export const checkIfCertIsPresent = (clientCert: Certificate): boolean => {
   const certsFolder = userDataCertsPath();
@@ -17,7 +22,7 @@ export const checkIfCertIsPresent = (clientCert: Certificate): boolean => {
   let certToVerify: X509Certificate | undefined;
 
   try {
-    if (clientCertHasCA) {
+    if (clientCertHasCA && clientCert.issuerCert) {
       certToVerify = new X509Certificate(clientCert.issuerCert.data);
     }
 

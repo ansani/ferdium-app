@@ -1,4 +1,3 @@
-import { ipcRenderer } from 'electron';
 import { type MouseEventHandler, useEffect, useState } from 'react';
 import {
   type WrappedComponentProps,
@@ -7,6 +6,7 @@ import {
 } from 'react-intl';
 import { SCREENSHARE_CANCELLED_BY_USER } from '../config';
 import { isWayland } from '../environment';
+import { ipcInvoke, ipcOn } from '../tauri-ipc';
 import type Service from '../models/Service';
 import FullscreenLoader from './ui/FullscreenLoader';
 
@@ -61,16 +61,13 @@ function MediaSource(props: IProps) {
       setTrackerId(data.trackerId);
     };
 
-    ipcRenderer.on(
+    const unlisten = ipcOn(
       `select-capture-device:${service.id}`,
       handleSelectCaptureDevice,
     );
 
     return () => {
-      ipcRenderer.removeListener(
-        `select-capture-device:${service.id}`,
-        handleSelectCaptureDevice,
-      );
+      unlisten();
     };
   }, [service.id, loadingSources]);
 
@@ -93,8 +90,7 @@ function MediaSource(props: IProps) {
   useEffect(() => {
     if (show) {
       setLoadingSources(true);
-      ipcRenderer
-        .invoke('get-desktop-capturer-sources')
+      ipcInvoke<any[]>('get-desktop-capturer-sources')
         .then(sources => {
           if (isWayland) {
             // On Linux, we do not need to prompt the user again for the source

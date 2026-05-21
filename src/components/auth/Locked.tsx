@@ -1,4 +1,3 @@
-import { systemPreferences } from '@electron/remote';
 import { noop } from 'lodash';
 import { observer } from 'mobx-react';
 import { Component } from 'react';
@@ -12,6 +11,12 @@ import Form from '../../lib/Form';
 import Button from '../ui/button';
 import { H1 } from '../ui/headline';
 import Input from '../ui/input/index';
+
+// Touch ID is macOS-specific and was provided by Electron's systemPreferences.
+// In Tauri, Touch ID biometric unlock is not yet supported; the button is hidden.
+const canPromptTouchID = (): boolean => false;
+const promptTouchID = (_reason: string): Promise<void> =>
+  Promise.reject(new Error('Touch ID not available in Tauri'));
 
 const messages = defineMessages({
   headline: {
@@ -79,11 +84,11 @@ class Locked extends Component<IProps> {
   touchIdUnlock() {
     const { intl } = this.props;
 
-    systemPreferences
-      .promptTouchID(intl.formatMessage(messages.touchId))
+    promptTouchID(intl.formatMessage(messages.touchId))
       .then(() => {
         this.props.unlock();
-      });
+      })
+      .catch(noop);
   }
 
   render() {
@@ -91,7 +96,7 @@ class Locked extends Component<IProps> {
     const { isSubmitting, error, useTouchIdToUnlock, intl } = this.props;
 
     const touchIdEnabled = isMac
-      ? useTouchIdToUnlock && systemPreferences.canPromptTouchID()
+      ? useTouchIdToUnlock && canPromptTouchID()
       : false;
     const submitButtonLabel = touchIdEnabled
       ? intl.formatMessage(messages.unlockWithPassword)

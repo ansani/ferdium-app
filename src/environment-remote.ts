@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { invoke } from '@tauri-apps/api/core';
 import {
   DEV_API_FRANZ_WEBSITE,
   DEV_FRANZ_API,
@@ -10,38 +11,67 @@ import {
   LOCAL_API_WEBSITE,
   LOCAL_WS_API,
 } from './config';
-import { api as electronApi } from './electron-util';
-import { isWindows } from './environment';
 
-export const { app } = electronApi;
-export const ferdiumVersion: string = app.getVersion();
-export const ferdiumLocale: string = app.getLocale();
+// Version and locale are fetched from the Tauri runtime.
+// We initialise with safe fallbacks and update asynchronously; callers that
+// need the definitive value should await getVersion()/getLocale().
+let resolvedVersion = '0.0.0';
+let resolvedLocale =
+  (typeof navigator !== 'undefined' && navigator.language) || 'en-US';
 
-// Set app directory before loading user modules
-if (process.env.FERDIUM_APPDATA_DIR != null) {
-  app.setPath('appData', process.env.FERDIUM_APPDATA_DIR);
-  app.setPath('userData', app.getPath('appData'));
-} else if (process.env.PORTABLE_EXECUTABLE_DIR != null) {
-  app.setPath(
-    'appData',
-    join(process.env.PORTABLE_EXECUTABLE_DIR, `${app.name}AppData`),
+invoke<string>('get_version')
+  .then(v => {
+    resolvedVersion = v;
+  })
+  .catch(() => {});
+
+invoke<string>('get_locale')
+  .then(l => {
+    resolvedLocale = l;
+  })
+  .catch(() => {});
+
+export const ferdiumVersion: string = resolvedVersion;
+export const ferdiumLocale: string = resolvedLocale;
+
+// Stub app object for compatibility with code that still imports { app }
+export const app = {
+  getVersion: () => ferdiumVersion,
+  getLocale: () => ferdiumLocale,
+  getPath: (_name: string) => userDataPath(),
+  setPath: (_name: string, _value: string) => {},
+  isPackaged: process.env.NODE_ENV === 'production',
+  name: 'Ferdium',
+};
+
+function getUserDataBase(): string {
+  if (process.env.FERDIUM_APPDATA_DIR) {
+    return process.env.FERDIUM_APPDATA_DIR;
+  }
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
+  if (process.platform === 'darwin') {
+    return join(home, 'Library', 'Application Support', 'Ferdium');
+  }
+  if (process.platform === 'win32') {
+    return join(process.env.APPDATA ?? home, 'Ferdium');
+  }
+  return join(
+    process.env.XDG_CONFIG_HOME ?? join(home, '.config'),
+    'Ferdium',
   );
-  app.setPath('userData', join(app.getPath('appData'), `${app.name}AppData`));
-} else if (isWindows && process.env.APPDATA != null) {
-  app.setPath('appData', process.env.APPDATA);
-  app.setPath('userData', join(app.getPath('appData'), app.name));
 }
 
 export const isDevMode: boolean =
-  process.env.ELECTRON_IS_DEV === undefined
-    ? !app.isPackaged
-    : Number.parseInt(process.env.ELECTRON_IS_DEV, 10) === 1;
-if (isDevMode) {
-  app.setPath('userData', join(app.getPath('appData'), `${app.name}Dev`));
-}
+  process.env.NODE_ENV === 'development' ||
+  process.env.TAURI_DEBUG === '1' ||
+  process.env.ELECTRON_IS_DEV === '1';
+
+const _userDataBase = isDevMode
+  ? `${getUserDataBase()}Dev`
+  : getUserDataBase();
 
 export const userDataPath = (...segments: string[]): string => {
-  return join(app.getPath('userData'), ...[segments].flat());
+  return join(_userDataBase, ...[segments].flat());
 };
 
 export const userDataRecipesPath = (...segments: string[]): string => {
@@ -76,5 +106,4 @@ export const API: string = api;
 export const API_VERSION: string = 'v1';
 export const WS_API: string = wsApi;
 export const WEBSITE: string = web;
-// For deeplink protocol: 'ferdium' or 'ferdium-dev' if we want '{DEEPLINK_PROTOCOL_CLIENT}://'
 export const protocolClient = isDevMode ? 'ferdium-dev' : 'ferdium';

@@ -16,7 +16,7 @@ import {
   ListItemText,
   Typography,
 } from '@mui/material';
-import { shell } from 'electron';
+import { open } from '@tauri-apps/plugin-shell';
 import { round } from 'lodash';
 import { observer } from 'mobx-react';
 import prettyBytes from 'pretty-bytes';
@@ -188,7 +188,7 @@ class DownloadManagerDashboard extends Component<IProps, IState> {
                             state === 'completed' ? undefined : 'none',
                         }}
                         onClick={() => {
-                          if (savePath) shell.openPath(savePath);
+                          if (savePath) open(savePath);
                         }}
                       >
                         <Typography
@@ -286,7 +286,10 @@ class DownloadManagerDashboard extends Component<IProps, IState> {
                     <IconButton
                       color="primary"
                       onClick={() => {
-                        if (savePath) shell.showItemInFolder(savePath);
+                        if (savePath) {
+                          const dir = require('node:path').dirname(savePath);
+                          open(dir);
+                        }
                       }}
                       size="small"
                     >

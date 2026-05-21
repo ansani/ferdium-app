@@ -1,6 +1,6 @@
 import type { ExecException } from 'node:child_process';
-import { ipcRenderer } from 'electron';
 import fastFolderSize from 'fast-folder-size';
+import { ipcInvoke, ipcSend } from '../../tauri-ipc';
 
 import { getServicePartitionsDirectory } from '../../helpers/service-helpers';
 
@@ -9,20 +9,16 @@ const debug = require('../../preload-safe-debug')('Ferdium:LocalApi');
 export default class LocalApi {
   // Settings
   getAppSettings(type: string) {
-    return new Promise(resolve => {
-      ipcRenderer.once('appSettings', (_event, resp) => {
-        debug('LocalApi::getAppSettings resolves', resp.type, resp.data);
-        resolve(resp);
-      });
-
-      ipcRenderer.send('getAppSettings', type);
+    // Invoke the Tauri command and return the actual settings data
+    return ipcInvoke<{ type: string; data: any }>('getAppSettings', {
+      settingsType: type,
     });
   }
 
   async updateAppSettings(type: string, data: any) {
     debug('LocalApi::updateAppSettings resolves', type, data);
-    ipcRenderer.send('updateAppSettings', {
-      type,
+    ipcSend('updateAppSettings', {
+      settingsType: type,
       data,
     });
   }
@@ -59,7 +55,7 @@ export default class LocalApi {
       ],
       quotas: ['temporary', 'persistent', 'syncable'],
     };
-    ipcRenderer.send('clear-storage-data', { serviceId, targetsToClear });
-    return ipcRenderer.invoke('clear-cache', { serviceId });
+    ipcSend('clear-storage-data', { serviceId, targetsToClear });
+    return ipcInvoke('clear-cache', { serviceId });
   }
 }

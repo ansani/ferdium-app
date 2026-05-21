@@ -1,4 +1,4 @@
-import { type AuthInfo, type BrowserWindow, ipcRenderer } from 'electron';
+import { ipcOn } from '../../tauri-ipc';
 
 import { state as ModalState } from './store';
 
@@ -13,23 +13,11 @@ export default function initialize() {
     state,
   };
 
-  ipcRenderer.on('feature:basic-auth-request', (e, data) => {
+  ipcOn<{ authInfo: typeof state.authInfo }>('feature:basic-auth-request', (e, data) => {
     debug(e, data);
-    // state.serviceId = data.serviceId;
     state.authInfo = data.authInfo;
     state.isModalVisible = true;
   });
 }
-
-export const mainIpcHandler = (
-  mainWindow: BrowserWindow,
-  authInfo: AuthInfo,
-) => {
-  debug('Sending basic auth call', authInfo);
-
-  mainWindow.webContents.send('feature:basic-auth-request', {
-    authInfo,
-  });
-};
 
 export { default as Component } from './Component';

@@ -1,4 +1,3 @@
-import { app, dialog } from '@electron/remote';
 import { mdiInformation } from '@mdi/js';
 import { noop } from 'lodash';
 import { observer } from 'mobx-react';
@@ -258,19 +257,12 @@ class EditServiceForm extends Component<IProps, IState> {
         label={intl.formatMessage(messages.deleteService)}
         className="settings__delete-button"
         onClick={() => {
-          // @ts-expect-error Fix me
-          const selection = dialog.showMessageBoxSync(app.mainWindow, {
-            type: 'question',
-            message: intl.formatMessage(messages.deleteService),
-            detail: intl.formatMessage(messages.confirmDeleteService, {
+          const confirmed = window.confirm(
+            `${intl.formatMessage(messages.deleteService)}\n${intl.formatMessage(messages.confirmDeleteService, {
               serviceName: service?.name || recipe.name,
-            }),
-            buttons: [
-              intl.formatMessage(globalMessages.yes),
-              intl.formatMessage(globalMessages.no),
-            ],
-          });
-          if (selection === 0) {
+            })}`,
+          );
+          if (confirmed) {
             onDelete();
           }
         }}

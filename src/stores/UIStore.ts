@@ -1,4 +1,3 @@
-import { nativeTheme } from '@electron/remote';
 import { action, computed, makeObservable, observable, reaction } from 'mobx';
 
 import type { Stores } from '../@types/stores.types';
@@ -10,7 +9,9 @@ import TypedStore from './lib/TypedStore';
 export default class UIStore extends TypedStore {
   @observable showServicesUpdatedInfoBar = false;
 
-  @observable isOsDarkThemeActive = nativeTheme.shouldUseDarkColors;
+  @observable isOsDarkThemeActive = window.matchMedia(
+    '(prefers-color-scheme: dark)',
+  ).matches;
 
   constructor(stores: Stores, api: ApiInterface, actions: Actions) {
     super(stores, api, actions);
@@ -25,11 +26,13 @@ export default class UIStore extends TypedStore {
       this._toggleServiceUpdatedInfoBar.bind(this),
     );
 
-    // Listen for theme change
-    nativeTheme.on('updated', () => {
-      this.isOsDarkThemeActive = nativeTheme.shouldUseDarkColors;
-      this.actions.service.shareSettingsWithServiceProcess();
-    });
+    // Listen for OS theme changes via the browser media query API
+    window
+      .matchMedia('(prefers-color-scheme: dark)')
+      .addEventListener('change', e => {
+        this.isOsDarkThemeActive = e.matches;
+        this.actions.service.shareSettingsWithServiceProcess();
+      });
   }
 
   setup(): void {

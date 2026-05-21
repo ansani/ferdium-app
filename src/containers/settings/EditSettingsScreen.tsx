@@ -1,4 +1,4 @@
-import { ipcRenderer } from 'electron';
+import { ipcSend } from '../../tauri-ipc';
 import { inject, observer } from 'mobx-react';
 import { Component, type ReactElement } from 'react';
 import {
@@ -543,7 +543,7 @@ class EditSettingsScreen extends Component<
         detail: intl.formatMessage(messages.restartDialogDetail),
       };
 
-      ipcRenderer.send('relaunch-app', options);
+      ipcSend('relaunch-app', options);
     }
 
     settings.update({
@@ -585,7 +585,7 @@ class EditSettingsScreen extends Component<
   }
 
   openProcessManager() {
-    ipcRenderer.send('openProcessManager');
+    ipcSend('openProcessManager');
   }
 
   prepareForm() {

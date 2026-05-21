@@ -1,4 +1,3 @@
-import { webFrame } from 'electron';
 
 import { RouterStore } from '@superwf/mobx-react-router';
 import { createHashHistory } from 'history';
@@ -16,8 +15,6 @@ import storeFactory from './stores';
 import I18N from './I18n';
 import FerdiumRoutes from './routes';
 
-// Basic electron Setup
-webFrame.setVisualZoomLevelLimits(1, 1);
 
 window.addEventListener('load', () => {
   const serverApi = new ServerApi();

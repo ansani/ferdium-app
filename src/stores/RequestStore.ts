@@ -1,4 +1,4 @@
-import { ipcRenderer } from 'electron';
+import { ipcInvoke } from '../tauri-ipc';
 import { action, computed, makeObservable, observable } from 'mobx';
 import ms from 'ms';
 
@@ -46,9 +46,17 @@ export default class RequestStore extends TypedStore {
     this.userInfoRequest = this.stores.user.getUserInfoRequest;
     this.servicesRequest = this.stores.services.allServicesRequest;
 
-    ipcRenderer.on('localServerPort', (_, data) => {
-      this.setData(data);
-    });
+    // Invoke the Tauri command directly to get (or start) the local server and
+    // capture the returned port + token.  The backend no longer needs to emit a
+    // 'localServerPort' event; instead we resolve the promise here.
+    try {
+      const info = await ipcInvoke<{ port: number; token?: string }>(
+        'startLocalServer',
+      );
+      this.setData({ port: info.port, token: info.token });
+    } catch (err) {
+      console.warn('[RequestStore] startLocalServer failed:', err);
+    }
   }
 
   @computed get areRequiredRequestsSuccessful(): boolean {

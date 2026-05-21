@@ -65,7 +65,6 @@ const copyManualAssets = () => {
     fs.mkdirSync(outDir);
   }
   fs.copyFileSync('package.json', `${outDir}/package.json`);
-  fs.copyFileSync('electron-builder.npmrc', `${outDir}/.npmrc`);
 
   const buildInfoData = {
     timestamp: buildInfo.timestamp,
@@ -88,8 +87,24 @@ const runEsbuild = async () => {
   }
   copyManualAssets();
 
-  // Source files
-  const entryPoints = await glob('./src/**/*.{ts,tsx,js,jsx}');
+  // Source files (exclude Electron main-process files, now handled by Rust/Tauri)
+  const mainProcessExcludes = new Set([
+    'src/index.ts',
+    'src/enforce-macos-app-location.ts',
+    'src/lib/Tray.ts',
+    'src/lib/Menu.ts',
+    'src/lib/TouchBar.ts',
+    'src/lib/DBus.ts',
+  ]);
+  const allEntryPoints = await glob('./src/**/*.{ts,tsx,js,jsx}');
+  const entryPoints = allEntryPoints.filter(
+    (f) =>
+      !mainProcessExcludes.has(f.replace(/^\.\//, '')) &&
+      !f.startsWith('./src/electron/') &&
+      !f.startsWith('./src/lib/dbus/') &&
+      !f.startsWith('./src/webview/') &&
+      f !== './src/features/todos/preload.ts',
+  );
 
   // Scss entry points
   entryPoints.push(

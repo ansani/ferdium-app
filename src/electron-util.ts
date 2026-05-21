@@ -1,39 +1,47 @@
-// Enhanced from: https://github.com/dertieran/electron-util/blob/replace-remote/source/api.js
-
-import { enable, initialize } from '@electron/remote/main';
-import * as electron from 'electron';
+// Tauri compatibility layer - replaces @electron/remote and electron
+// Provides stub implementations to keep import paths working while
+// the actual functionality is provided by @tauri-apps/api
 
 export const initializeRemote = (): void => {
-  if (process.type !== 'browser') {
-    throw new Error(
-      'The remote api must be initialized from the main process.',
-    );
-  }
-
-  initialize();
+  // No-op in Tauri - no remote module needed
 };
 
-export const enableWebContents = (webContents: electron.WebContents): void => {
-  enable(webContents);
+export const enableWebContents = (_webContents: any): void => {
+  // No-op in Tauri
 };
 
-export const remote = new Proxy(
+export const remote: any = new Proxy(
   {},
   {
     get: (_target, property) => {
-      // eslint-disable-next-line global-require
-      const remote = require('@electron/remote');
-      return remote[property];
+      if (property === 'app') {
+        return {
+          getVersion: () => '',
+          getLocale: () => 'en-US',
+          getPath: () => '',
+          setPath: () => {},
+          isPackaged: false,
+          name: 'Ferdium',
+        };
+      }
+      if (property === 'getCurrentWindow') return () => ({ id: 0 });
+      if (property === 'BrowserWindow') return class {};
+      if (property === 'Menu')
+        return { buildFromTemplate: () => ({}), popup: () => {} };
+      if (property === 'nativeTheme')
+        return {
+          shouldUseDarkColors: window.matchMedia('(prefers-color-scheme: dark)')
+            .matches,
+        };
+      if (property === 'powerMonitor') return { on: () => {} };
+      if (property === 'screen') return { getAllDisplays: () => [] };
+      if (property === 'process') return { execPath: '' };
+      if (property === 'session') return { fromPartition: () => ({}) };
+      if (property === 'webContents') return { fromId: () => null };
+      if (property === 'systemPreferences') return {};
+      return undefined;
     },
   },
 );
 
-export const api = new Proxy(electron, {
-  get: (target, property) => {
-    if (target[property]) {
-      return target[property];
-    }
-
-    return remote[property];
-  },
-});
+export const api = remote;

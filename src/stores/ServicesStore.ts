@@ -1,8 +1,8 @@
 import { join } from 'node:path';
-import { clipboard, ipcRenderer, shell } from 'electron';
 import { ensureFileSync, pathExistsSync, writeFileSync } from 'fs-extra';
 import { debounce, remove } from 'lodash';
 import { action, computed, makeObservable, observable, reaction } from 'mobx';
+import { ipcOn, ipcSend } from '../tauri-ipc';
 import ms from 'ms';
 
 import type { Stores } from '../@types/stores.types';
@@ -66,6 +66,8 @@ export default class ServicesStore extends TypedStore {
   @observable lastUsedServices: string[] = [];
 
   private toggleToTalkCallback = () => this.active?.toggleToTalk();
+
+  private _unlistenToggleToTalk: (() => void) | null = null;
 
   constructor(stores: Stores, api: ApiInterface, actions: Actions) {
     super(stores, api, actions);
@@ -241,7 +243,7 @@ export default class ServicesStore extends TypedStore {
   initialize() {
     super.initialize();
 
-    ipcRenderer.on('toggle-to-talk', this.toggleToTalkCallback);
+    this._unlistenToggleToTalk = ipcOn('toggle-to-talk', this.toggleToTalkCallback);
 
     // Check services to become hibernated
     this.serviceMaintenanceTick();
@@ -250,7 +252,10 @@ export default class ServicesStore extends TypedStore {
   teardown() {
     super.teardown();
 
-    ipcRenderer.off('toggle-to-talk', this.toggleToTalkCallback);
+    if (this._unlistenToggleToTalk) {
+      this._unlistenToggleToTalk();
+      this._unlistenToggleToTalk = null;
+    }
 
     // Stop checking services for hibernation
     this.serviceMaintenanceTick.cancel();
@@ -642,7 +647,14 @@ export default class ServicesStore extends TypedStore {
     } else {
       ensureFileSync(filePath);
     }
-    shell.showItemInFolder(filePath);
+    // Open file manager to show the file (shell.showItemInFolder replacement)
+    try {
+      const { open } = require('@tauri-apps/plugin-shell');
+      const dir = require('node:path').dirname(filePath);
+      open(dir);
+    } catch {
+      console.warn('Could not open file in folder', filePath);
+    }
   }
 
   @action async _clearCache({ serviceId }) {
@@ -736,8 +748,6 @@ export default class ServicesStore extends TypedStore {
         debug('Webview is not attached, initializing');
         service.initializeWebViewEvents({
           handleIPCMessage: this.actions.service.handleIPCMessage,
-          openWindow: this.actions.service.openWindow,
-          stores: this.stores,
         });
         service.initializeWebViewListener();
       }
@@ -746,6 +756,7 @@ export default class ServicesStore extends TypedStore {
   }
 
   @action _detachService({ service }) {
+    service.detachMessageHandler();
     // eslint-disable-next-line no-param-reassign
     service.webview = null;
     // eslint-disable-next-line no-param-reassign
@@ -842,7 +853,7 @@ export default class ServicesStore extends TypedStore {
 
       case 'load-available-displays': {
         debug('Received request for capture devices from', serviceId);
-        ipcRenderer.send('load-available-displays', {
+        ipcSend('load-available-displays', {
           serviceId,
           ...args[0],
         });
@@ -893,7 +904,10 @@ export default class ServicesStore extends TypedStore {
           ) {
             // with the extra "+ " it shows its copied to clipboard in the notification
             options.body = `+ ${rawBody}`;
-            clipboard.writeText(token);
+            // Use the browser clipboard API instead of electron clipboard
+            navigator.clipboard?.writeText(token).catch(err => {
+              console.warn('Could not write to clipboard:', err);
+            });
             debug('Token parsed and copied to clipboard');
           }
         }
@@ -1335,12 +1349,11 @@ export default class ServicesStore extends TypedStore {
         unreadDirectMessageCount,
         unreadIndirectMessageCount,
       });
-      ipcRenderer.send(
-        'updateDBusUnread',
-        unreadDirectMessageCount,
-        unreadIndirectMessageCount,
+      ipcSend('updateDBusUnread', {
+        direct: unreadDirectMessageCount,
+        indirect: unreadIndirectMessageCount,
         unreadServices,
-      );
+      });
     }
   }
 

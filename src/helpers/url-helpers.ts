@@ -1,6 +1,6 @@
 // This is taken from: https://benjamin-altpeter.de/shell-openexternal-dangers/
 import { URL } from 'node:url';
-import { shell } from 'electron';
+import { open } from '@tauri-apps/plugin-shell';
 import { ensureDirSync, existsSync } from 'fs-extra';
 import normalizeUrl from 'normalize-url';
 import { ALLOWED_PROTOCOLS } from '../config';
@@ -36,7 +36,7 @@ export const isValidFileUrl = (path: string): boolean => {
 
 export async function openPath(folderName: string): Promise<void> {
   ensureDirSync(folderName);
-  shell.openPath(folderName);
+  await open(folderName);
 }
 
 // TODO: Need to verify and fix/remove the skipping logic. Ideally, we should never skip this check
@@ -47,7 +47,9 @@ export const openExternalUrl = (
   const fixedUrl = fixUrl(url.toString());
   debug('Open url:', fixedUrl, 'with skipValidityCheck:', skipValidityCheck);
   if (skipValidityCheck || isValidExternalURL(fixedUrl)) {
-    shell.openExternal(fixedUrl.toString());
+    open(fixedUrl.toString()).catch((err: unknown) => {
+      debug('openExternal failed:', err);
+    });
   }
 };
 

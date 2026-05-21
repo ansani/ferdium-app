@@ -1,5 +1,3 @@
-import { getCurrentWindow } from '@electron/remote';
-import { ipcRenderer } from 'electron';
 import { action, computed, makeObservable, observable, reaction } from 'mobx';
 import localStorage from 'mobx-localstorage';
 import type { Stores } from '../@types/stores.types';
@@ -12,6 +10,7 @@ import {
   LOCAL_SERVER,
 } from '../config';
 import { hash } from '../helpers/password-helpers';
+import { ipcOn, ipcSend } from '../tauri-ipc';
 import TypedStore from './lib/TypedStore';
 
 const debug = require('../preload-safe-debug')('Ferdium:SettingsStore');
@@ -43,9 +42,7 @@ export default class SettingsStore extends TypedStore {
     reaction(
       () => this.all.app.autohideMenuBar,
       () => {
-        const currentWindow = getCurrentWindow();
-        currentWindow.setMenuBarVisibility(!this.all.app.autohideMenuBar);
-        currentWindow.autoHideMenuBar = this.all.app.autohideMenuBar;
+        // Menu bar visibility is managed by Tauri's native menu system
       },
     );
 
@@ -53,15 +50,15 @@ export default class SettingsStore extends TypedStore {
       () => this.all.app.server,
       server => {
         if (server === LOCAL_SERVER) {
-          ipcRenderer.send('startLocalServer');
+          ipcSend('startLocalServer');
         }
       },
       { fireImmediately: true },
     );
 
-    // Inactivity lock timer
-    let inactivityTimer;
-    getCurrentWindow().on('blur', () => {
+    // Inactivity lock timer - use window blur/focus events
+    let inactivityTimer: ReturnType<typeof setTimeout> | undefined;
+    window.addEventListener('blur', () => {
       if (
         this.all.app.isLockingFeatureEnabled &&
         this.all.app.inactivityLock !== 0
@@ -79,13 +76,13 @@ export default class SettingsStore extends TypedStore {
         );
       }
     });
-    getCurrentWindow().on('focus', () => {
+    window.addEventListener('focus', () => {
       if (inactivityTimer) {
         clearTimeout(inactivityTimer);
       }
     });
 
-    ipcRenderer.on('appSettings', (_, resp) => {
+    ipcOn<{ type: string; data: any }>('appSettings', (_, resp) => {
       // Lock on startup if enabled in settings
       if (
         !this.loaded &&
@@ -104,11 +101,11 @@ export default class SettingsStore extends TypedStore {
         data: resp.data,
       });
       this.setLoaded();
-      ipcRenderer.send('initialAppSettings', resp);
+      ipcSend('initialAppSettings', { settingsType: resp.type, data: resp.data });
     });
 
     for (const type of this.fileSystemSettingsTypes) {
-      ipcRenderer.send('getAppSettings', type);
+      ipcSend('getAppSettings', { settingsType: type });
     }
   }
 
@@ -163,8 +160,8 @@ export default class SettingsStore extends TypedStore {
     const appSettings = this.all;
     if (this.fileSystemSettingsTypes.includes(type)) {
       debug('Update settings on file system', type, data);
-      ipcRenderer.send('updateAppSettings', {
-        type,
+      ipcSend('updateAppSettings', {
+        settingsType: type,
         data,
       });
 
