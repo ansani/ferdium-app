@@ -50,7 +50,7 @@ If so, engage in the already existing discussion.
 
 ### Install system-level dependencies
 
-_Note:_ This list can likely get outdated. If so, please refer to the specific version of the [electronuserland builder](https://hub.docker.com/r/electronuserland/builder) that we use in our [Dockerfile](./Dockerfile).
+_Note:_ This list can likely get outdated. If so, please refer to the versions pinned in [`package.json`](./package.json) and the Tauri requirements in [`src-tauri/Cargo.toml`](./src-tauri/Cargo.toml).
 
 #### Node.js, pnpm
 
@@ -150,8 +150,7 @@ pnpm debug
 ```
 
 Note: please prefer [`debug()`](https://github.com/visionmedia/debug) over `console.log()`.
-However, due to an [Electron bug](https://github.com/electron/electron/issues/31689), using `require('debug')` directly is dangerous and can lead to data loss in services.
-Please use the `src/preload-safe-debug` module instead until the bug gets fixed.
+Please use the `src/preload-safe-debug` module instead of importing `debug` directly.
 
 ### Styleguide
 
@@ -169,10 +168,10 @@ Please use the `src/preload-safe-debug` module instead until the bug gets fixed.
 
 ### Code Signing on a mac (not necessary in the normal circumstances)
 
-If you want to self-sign on a mac with non-registered certificate (not for distribution of the resulting package), you can follow [this thread](https://github.com/electron/electron/issues/7476#issuecomment-356084754) and run this command:
+If you want to self-sign on a mac with non-registered certificate (not for distribution of the resulting package), configure code-signing in `src-tauri/tauri.conf.json` and run:
 
 ```bash
-codesign --deep --force --verbose --sign - node_modules/electron/dist/Electron.app
+cargo tauri build --bundles app
 ```
 
 ## Release

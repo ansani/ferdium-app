@@ -29,4 +29,4 @@ Please ensure you've completed all of the following.
 
 #### Release Notes
 
-<!-- Please add a one-line description for users of Ferdium to read in the release notes, or 'none' if no notes relevant to such users. Examples and help on special cases: https://github.com/electron/clerk/blob/master/README.md#examples -->
+<!-- Please add a one-line description for users of Ferdium to read in the release notes, or 'none' if no notes relevant to such users. -->

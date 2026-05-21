@@ -12,4 +12,4 @@ If you discover a minor vulnerability in Ferdium, please create a new issue on G
 
 If you discover a major vulnerability in Ferdium, please report it to us via E-Mail to [hello@ferdium.org](mailto:hello@ferdium.org?subject=[Security]%20), prefixing your E-Mail subject with "[Security]". We will then come in contact with you as quickly as possible.
 
-Please keep in mind that some vulnerabilities you find may not be due to Ferdium but instead due to ElectronJS or Chromium. In that case, please contact the owners of those projects instead.
+Please keep in mind that some vulnerabilities you find may not be due to Ferdium but instead due to Tauri, Wry, or the underlying system webview runtime. In that case, please contact the owners of those projects instead.
