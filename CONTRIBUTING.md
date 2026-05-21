@@ -168,7 +168,7 @@ Please use the `src/preload-safe-debug` module instead of importing `debug` dire
 
 ### Code Signing on a mac (not necessary in the normal circumstances)
 
-If you want to self-sign on a mac with non-registered certificate (not for distribution of the resulting package), configure code-signing in `src-tauri/tauri.conf.json` and run:
+If you want to self-sign on a mac with non-registered certificate (not for distribution of the resulting package), configure code-signing in `src-tauri/tauri.conf.json` and run the following command from the repository root (with the Tauri CLI installed):
 
 ```bash
 cargo tauri build --bundles app
