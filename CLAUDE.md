@@ -4,16 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Ferdium is an Electron desktop app that aggregates messaging services (Slack, WhatsApp, Gmail, etc.) into a single window. It's a hard fork of Franz with no restrictions. Uses Electron + React + MobX + TypeScript with an embedded AdonisJS internal server.
+Ferdium is a Tauri desktop app that aggregates messaging services (Slack, WhatsApp, Gmail, etc.) into a single window. It's a hard fork of Franz with no restrictions. Uses Tauri + React + MobX + TypeScript with an embedded AdonisJS internal server.
 
 ## Essential Commands
 
 ```bash
 pnpm install              # Install dependencies (requires Node 22.18.0, pnpm 10.14.0)
 pnpm dev                  # Start esbuild in watch mode (serves on http://127.0.0.1:8080)
-pnpm start                # Launch Electron with built app (run after dev or build)
-pnpm start:all-dev        # Dev + Electron together (waits for dev server, then launches)
-pnpm debug                # Same as start:all-dev but with DEBUG=Ferdium:* logging
+pnpm start                # Run Tauri in development mode (tauri dev)
+pnpm start:all-dev        # Same as pnpm start (tauri dev)
+pnpm debug                # Same as pnpm start:all-dev but with DEBUG=Ferdium:* logging
 
 pnpm test                 # Run Jest tests with coverage
 pnpm test:watch           # Jest in watch mode
@@ -23,7 +23,7 @@ pnpm typecheck            # TypeScript type checking (tsc --noEmit)
 pnpm lint                 # ESLint with zero warnings allowed (--max-warnings 0)
 pnpm lint:fix             # ESLint with auto-fix + cache
 pnpm prepare-code         # Full pre-commit check: typecheck + lint:fix + biome + prettier + translations
-pnpm build                # Production build: esbuild + electron-builder
+pnpm build                # Production build: esbuild + tauri build
 ```
 
 ## Git Hooks
@@ -33,10 +33,10 @@ pnpm build                # Production build: esbuild + electron-builder
 
 ## Architecture
 
-### Process Model (Electron)
+### Process Model (Tauri)
 
-- **Main process** (`src/index.ts`): App lifecycle, window management, IPC handlers, deep linking, auto-updates, tray icon, global shortcuts
-- **Renderer process** (`src/app.tsx`): React UI with MobX state management and React Router
+- **Tauri backend** (`src-tauri/src/main.rs`): App lifecycle, native plugin wiring, command registration, and window setup
+- **Frontend bootstrap** (`src/app.tsx`): React UI initialization, MobX stores, routing, and renderer logic
 
 ### State Management (MobX)
 
@@ -90,12 +90,13 @@ Each feature in `src/features/` is self-contained with its own store, components
 - `src/helpers/` - Utility functions (URL, validation, userAgent, i18n)
 - `src/themes/` - Theme configs (dark, default, legacy)
 - `src/i18n/` - Translations (managed via `pnpm manage-translations`)
-- `src/electron/` - Main process utilities (IPC API, Settings, deep linking)
+- `src-tauri/` - Tauri Rust backend (command handlers, plugins, native integration)
+- `src/electron/` - Legacy Electron integration code (excluded from the current Tauri/esbuild build path)
 - `src/lib/` - System integrations (Menu, Tray, TouchBar, DBus)
 
 ### Build System
 
-Uses **esbuild** (`esbuild.mjs`) for bundling. Compiles TS/TSX to CommonJS, processes SCSS, copies static assets to `./build`. Packaging via **electron-builder** (`electron-builder.yml`) for macOS/Windows/Linux.
+Uses **esbuild** (`esbuild.mjs`) for bundling. Compiles TS/TSX to CommonJS, processes SCSS, copies static assets to `./build`. Packaging via **tauri build** (`src-tauri/tauri.conf.json`) for macOS/Windows/Linux.
 
 ### Styling
 
